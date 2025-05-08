@@ -7,7 +7,7 @@ import hre from "hardhat";
 import { ethers } from "ethers";
 import { buildBabyjub, Point } from "circomlibjs";
 import { Prover, Voter, SubmitPublicKey, Decrypt } from "../component/prover";
-import { toBytes, fromBytes } from 'viem'
+import { toBytes, fromBytes, NonceTooLowError } from 'viem'
 import { getPublicKey } from "../component/util";
 
 describe("Verifier", function () {
@@ -77,7 +77,9 @@ describe("Verifier", function () {
       const proof = await prover.prove({
         privateKey: fixture.counterPrivates[i],
       }, 2);
+      let now = new Date();
       const rsp = await fixture.avote.write.SubmitPublicKey(proof);
+      console.log(new Date().getTime() - now.getTime())
       await fixture.publicClient.waitForTransactionReceipt({hash: rsp});
       const voteEvents = await fixture.avote.getEvents.SubmitPublicKeyLog();
       expect(voteEvents).to.have.lengthOf(1);
@@ -95,8 +97,8 @@ describe("Verifier", function () {
 
     expect(publicKey).to.deep.equals(
       [
-        fixture.curve.F.e(14375671024367317053475448601903030846804814549326919827516608444060926556218n.toString()),
-        fixture.curve.F.e(4832671415307572926401902542147077309623270687999648656431800425272197455509n.toString()),
+        fixture.curve.F.e(10981563598801205623359592314677833300087079990999938873324121769192133307962n.toString()),
+        fixture.curve.F.e(6300402212863780602412389550578979668773005062754014312139548457863915860054n.toString()),
       ],
     );
   })
