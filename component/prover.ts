@@ -12,6 +12,7 @@ interface BaseCreateSignalParam {
 interface CreateVoteSignalsParam {
     publicKey: Point;
     value: number;
+    randomK: bigint;
 }
 
 interface CreatePublicKeySignalsParam {
@@ -24,17 +25,18 @@ interface CreateDecryptSignalsParam {
     c1: Point;
 }
 
-export abstract class Prover {
+export abstract class Prover<PublicSignalLength extends number = number> {
 
     private wasmPath: string;
     private zkeyPath: string;
+    private publicSignalLength: PublicSignalLength;
 
     abstract createSignals(params: BaseCreateSignalParam): Promise<snarkjs.CircuitSignals>;
-    // abstract submitToContract(proof: snarkjs.Groth16Proof, publicSignals: snarkjs.PublicSignals):  Promise<ethers.ContractTransactionResponse>;
 
-    public constructor(wasmPath: string, zkeyPath: string) {
+    public constructor(wasmPath: string, zkeyPath: string, publicSignalLength: PublicSignalLength) {
         this.wasmPath = wasmPath;
         this.zkeyPath = zkeyPath;
+        this.publicSignalLength = publicSignalLength;
     }
 
     private createProve(signals: snarkjs.CircuitSignals): Promise<{
@@ -48,26 +50,32 @@ export abstract class Prover {
         );
     }
 
-    public async prove<L extends number>(params: BaseCreateSignalParam, l: L): Promise<[
+    public async prove(params: BaseCreateSignalParam): Promise<[
         _pA: [bigint, bigint],
         _pB: [[bigint, bigint], [bigint, bigint]],
         _pC: [bigint, bigint],
-        _pubSignals: BigNumberishTuple<L>,
+        _pubSignals: BigNumberishTuple<PublicSignalLength>,
       ]>{
         const signals = await this.createSignals(params);
         const {proof, publicSignals} = await this.createProve(signals);
-        return createSubmitParams<L>(proof, publicSignals, l);
+        return createSubmitParams(proof, publicSignals, this.publicSignalLength);
     }
 }
 
-export class Voter extends Prover {
-    public constructor() {
-        super("./circom/compile/vote_js/vote.wasm", "./circom/vote_0001.zkey");
+export class Voter extends Prover<6> {
+    private randomK: bigint;
+    public constructor(randomK: bigint | null) {
+        super("./circom/compile/vote_js/vote.wasm", "./circom/vote_0001.zkey", 6);
+        if (randomK == null) {
+            this.randomK = ethers.toBigInt( ethers.randomBytes(32) );
+        } else {
+            this.randomK = randomK;
+        }
     }
     async createSignals(params: CreateVoteSignalsParam): Promise<snarkjs.CircuitSignals> {
         const curve = await buildBabyjub();
         const m: Point = curve.mulPointEscalar(curve.Base8, params.value);  // the mapped point in the curve of value value
-        const k: bigint = ethers.toBigInt( ethers.randomBytes(32) ); // random big number
+        const k: bigint = this.randomK; // random big number
         const c1: Point = curve.mulPointEscalar(curve.Base8, k);
         const c2: Point = curve.addPoint(m, curve.mulPointEscalar(params.publicKey, k));
         return {
@@ -84,9 +92,9 @@ export class Voter extends Prover {
     }
 }
 
-export class SubmitPublicKey extends Prover {
+export class SubmitPublicKey extends Prover<2> {
     public constructor() {
-        super("./circom/compile/publickey_js/publickey.wasm", "./circom/publickey_0001.zkey");
+        super("./circom/compile/publickey_js/publickey.wasm", "./circom/publickey_0001.zkey", 2);
     }
     async createSignals(params: CreatePublicKeySignalsParam): Promise<snarkjs.CircuitSignals> {
         const curve = await buildBabyjub();
@@ -99,9 +107,9 @@ export class SubmitPublicKey extends Prover {
     }
 }
 
-export class Decrypt extends Prover {
+export class Decrypt extends Prover<6> {
     public constructor() {
-        super("./circom/compile/decrypt_js/decrypt.wasm", "./circom/decrypt_0001.zkey");
+        super("./circom/compile/decrypt_js/decrypt.wasm", "./circom/decrypt_0001.zkey", 6);
     }
     async createSignals(params: CreateDecryptSignalsParam): Promise<snarkjs.CircuitSignals> {
         const curve = await buildBabyjub();
@@ -121,13 +129,13 @@ export class Decrypt extends Prover {
 type BigNumberishTuple<N extends number, T extends any[] = []> = 
   T['length'] extends N ? T : BigNumberishTuple<N, [...T, bigint]>;
 
-function createSubmitParams<PublicSignalLength extends number>(proof: snarkjs.Groth16Proof, publicSignals: snarkjs.PublicSignals, l: PublicSignalLength): [
+function createSubmitParams<PublicSignalLength extends number>(proof: snarkjs.Groth16Proof, publicSignals: snarkjs.PublicSignals, length: PublicSignalLength): [
     _pA: [bigint, bigint],
     _pB: [[bigint, bigint], [bigint, bigint]],
     _pC: [bigint, bigint],
     _pubSignals: BigNumberishTuple<PublicSignalLength>,
   ] {
-    if (publicSignals.length !== l) {
+    if (publicSignals.length !== length) {
         throw new Error(`Input array must have exactly ${length} elements`);
     }
     return [

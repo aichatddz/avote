@@ -9,12 +9,18 @@ struct Point {
     uint256 y;
 }
 
+struct Cipher {
+    Point c1;
+    Point c2;
+}
+
 interface IVoter {
-    function Vote(uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[4] calldata _pubSignals) external;
+    function Vote(uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[6] calldata _pubSignals) external;
+    function Votes() external view returns (Cipher[] memory);
 }
 
 interface ICounter {
     function SubmitPublicKey(uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[2] calldata _pubSignals) external payable;
     function Decrypt(uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[6] calldata _pubSignals) external;
-    function PublicKeys() external view returns (Point[] memory);
+    function CounterPublicKeys() external view returns (Point[] memory);
 }

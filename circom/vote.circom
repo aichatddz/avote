@@ -82,4 +82,4 @@ template ECElGamalEncryptBabyJubjub(n) {
     c2.yout === c2y;
 }
 
-component main {public [qx, qy, c1x, c1y]} = ECElGamalEncryptBabyJubjub(256);
+component main {public [qx, qy, c1x, c1y, c2x, c2y]} = ECElGamalEncryptBabyJubjub(256);
