@@ -21,6 +21,7 @@ interface VoterTestValue {
 interface CounterTestValue {
   private: bigint;
   // public: BigPoint;
+  dMulC1: BigPoint;
 }
 
 describe("Verifier", function () {
@@ -39,12 +40,24 @@ describe("Verifier", function () {
     const counterTestValues: CounterTestValue[] = [
       {
         private: 5111791321839995612998814389345637054499093359564416875491757815117927907641n,
+        dMulC1: {
+          x: 21060199294472796084982534866007706279035430850744535851664096007363470796512n,
+          y: 11603841557478012364370778654454713101871249856570144058518964057339169702910n,
+        }
       },
       {
         private: 8210300147052601658608945551383277467688394719712126374785156317380012298333n,
+        dMulC1: {
+          x:12269050104999195286909272156231407031499654257916602741971159968944959897696n,
+          y:1995017120749672033749369710489526015636845315560103834649149942325729798175n,
+        }
       },
       {
         private: 10253883521808019204853708370069688980921908910512304424237432623098941967830n,
+        dMulC1: {
+          x: 20037778258635027387713413476100334834433783697655177574400635981089193432941n,
+          y: 12826537691488756595648255324240107980415121702392751894878026383342358057313n,
+        }
       },
       
     ]
@@ -125,7 +138,12 @@ describe("Verifier", function () {
       c1: [curve.F.e(18629587583109758222956856306882325145673860087269427350730526597800224619601n.toString()), curve.F.e(683480845838943359639168620445058004464864819757064769093498759713289221902n.toString())],
       c2: [curve.F.e(5617719615934595255789095923548416599813172291655663707339912450845434531886n.toString()), curve.F.e(13349838211921327038632543657684949518109877368565995020499265887914442115787n.toString())],
     }
-    return { curve, avote, counterTestValues, voterPrivates, expectPublicKey, sumCipher, owner, otherAccount, publicClient };
+
+    const sumDecrypts: BigPoint = {
+      x: 8822163606094289982356781232743593333012959930218074723247827723934443596550n,
+      y: 2251356934737190955365927299659143108203426563169770967572495864872694594664n,
+    }
+    return { curve, avote, counterTestValues, voterPrivates, expectPublicKey, sumCipher, sumDecrypts, owner, otherAccount, publicClient };
   }
 
   it("Should create the right random vote", async function () {
@@ -199,7 +217,13 @@ describe("Verifier", function () {
     }
 
     const decryptPoints = await fixture.avote.read.DecryptPoints();
+    expect(decryptPoints).to.have.lengthOf(fixture.counterTestValues.length);
+    for (let i = 0; i < decryptPoints.length; i++) {
+      expect(decryptPoints[i]).to.deep.equals(fixture.counterTestValues[i].dMulC1);
+    }
+
     const sumDecrypt = sumBigPoints(fixture.curve, decryptPoints);
+    expect(sumDecrypt).to.deep.equals(fixture.sumDecrypts);
     const plainPoint = decode(fixture.curve, sumDecrypt, toBigPoint(sumCipher.c2));
 
     let expectPlain: Point = fixture.curve.mulPointEscalar(fixture.curve.Base8, 8);
