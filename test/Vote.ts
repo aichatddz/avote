@@ -8,7 +8,7 @@ import { ethers, toBigInt } from "ethers";
 import { buildBabyjub, Point, BabyJub } from "circomlibjs";
 import { Prover, Voter, SubmitPublicKey, Decrypt } from "../component/prover";
 import { toBytes, fromBytes, NonceTooLowError } from 'viem'
-import { decrypt, sumPoints, BigPoint, Cipher, toPoint, sumBigPoints, decode, toBigPoint } from "../component/util";
+import { sumPoints, BigPoint, Cipher, toPoint, sumBigPoints, decode, toBigPoint } from "../component/util";
 
 interface VoterTestValue {
   private: bigint;  // it's not used yet
@@ -224,10 +224,10 @@ describe("Verifier", function () {
 
     const sumDecrypt = sumBigPoints(fixture.curve, decryptPoints);
     expect(sumDecrypt).to.deep.equals(fixture.sumDecrypts);
-    const plainPoint = decode(fixture.curve, sumDecrypt, toBigPoint(sumCipher.c2));
+    const plainPoint = decode(fixture.curve, sumDecrypt, toBigPoint(fixture.curve, sumCipher.c2));
 
     let expectPlain: Point = fixture.curve.mulPointEscalar(fixture.curve.Base8, 8);
-    expect(plainPoint).to.deep.equals(toBigPoint(expectPlain));
+    expect(plainPoint).to.deep.equals(toBigPoint(fixture.curve, expectPlain));
 
   })
 
