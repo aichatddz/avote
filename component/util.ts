@@ -6,10 +6,10 @@ export interface BigPoint {
     y: bigint;
 }
 
-export function toBigPoint(p: Point): BigPoint {
+export function toBigPoint(curve: BabyJub, p: Point): BigPoint {
     return {
-        x: ethers.toBigInt(p[0]),
-        y: ethers.toBigInt(p[1]),
+        x: ethers.toBigInt(curve.F.toString(p[0])),
+        y: ethers.toBigInt(curve.F.toString(p[1])),
     }
 }
 
@@ -35,11 +35,14 @@ export function sumPoints(curve: BabyJub, points: Point[]): Point {
 
 export function sumBigPoints(curve: BabyJub, bigPoints: readonly BigPoint[]): BigPoint {
     let points: Point[] = [];
+
     for (let i in bigPoints) {
+        console.log("before: ", bigPoints[i])
         points.push(toPoint(curve, bigPoints[i]))
+        console.log("after: ", toBigPoint(curve, points[i]))
     }
     let sum = sumPoints(curve, points);
-    return toBigPoint(sum);
+    return toBigPoint(curve, sum);
 }
 // export async function decrypt(c1s: Point[], counterPrivateKey: bigint): Promise<Point> {
 //     const curve = await buildBabyjub();
@@ -59,5 +62,5 @@ export function sumBigPoints(curve: BabyJub, bigPoints: readonly BigPoint[]): Bi
 export function decode(curve: BabyJub, dMulC1: BigPoint, c2: BigPoint): BigPoint {
     let negDSumC1: Point = [curve.F.e(-dMulC1.x), curve.F.e(dMulC1.y)];
     let plainPoint = curve.addPoint(toPoint(curve, c2), negDSumC1);
-    return toBigPoint(plainPoint)
+    return toBigPoint(curve, plainPoint)
 }
