@@ -8,7 +8,7 @@ import { ethers, toBigInt } from "ethers";
 import { buildBabyjub, Point, BabyJub } from "circomlibjs";
 import { Prover, Voter, SubmitPublicKey, Decrypt } from "../component/prover";
 import { toBytes, fromBytes, NonceTooLowError } from 'viem'
-import { sumPoints, BigPoint, Cipher, toPoint, sumBigPoints, decode, toBigPoint } from "../component/util";
+import { sumPoints, BigPoint, Cipher, toPoint, sumBigPoints, decode, toBigPoint, randomScalar} from "../component/util";
 
 interface VoterTestValue {
   private: bigint;  // it's not used yet
@@ -151,7 +151,7 @@ describe("Verifier", function () {
     const q: Point = fixture.expectPublicKey;  // public key
     const v = 3;  // vote value
 
-    let prover = new Voter(null);
+    let prover = new Voter(randomScalar(fixture.curve));
     const proof = await prover.prove({
       publicKey: q,
       value: v,
@@ -233,7 +233,7 @@ describe("Verifier", function () {
 
   it("Should add the right random public key", async function() {
     const fixture = await loadFixture(deployFixture);
-    const privateKey: bigint = randomOrder(fixture.curve.order);
+    const privateKey: bigint = randomScalar(fixture.curve);
     let prover = new SubmitPublicKey();
     const proof = await prover.prove({
         privateKey: privateKey,
@@ -274,9 +274,9 @@ describe("Verifier", function () {
 
   it("Should add the right decryption", async function() {
     const fixture = await loadFixture(deployFixture);
-    const privateKey: bigint = randomOrder(fixture.curve.order);
+    const privateKey: bigint = randomScalar(fixture.curve);
     const publicKey: Point = fixture.curve.mulPointEscalar(fixture.curve.Base8, privateKey);
-    const k: bigint = randomOrder(fixture.curve.order);
+    const k: bigint = randomScalar(fixture.curve);
     const c1: Point = fixture.curve.mulPointEscalar(fixture.curve.Base8, k);
 
     let prover = new Decrypt();
@@ -301,6 +301,3 @@ describe("Verifier", function () {
 
 });
 
-function randomOrder(modular: bigint): bigint {
-  return ethers.toBigInt(ethers.randomBytes(32)) % modular;
-}
