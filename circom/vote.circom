@@ -55,31 +55,31 @@ template ManualScalarMul(n) {
 
 template ECElGamalEncryptBabyJubjub(n) {
     signal input k[n];
-    signal input qx, qy;
-    signal input c1x, c1y;
-    signal input c2x, c2y;
-    signal input mx, my;
+    signal input publicKey[2];
+    signal input c1[2];
+    signal input c2[2];
+    signal input m[2];
 
-    component c1 = ManualScalarMul(n);
-    c1.k <== k;
-    c1.x <== 5299619240641551281634865583518297030282874472190772894086521144482721001553;
-    c1.y <== 16950150798460657717958625567821834550301663161624707787222815936182638968203;
+    component kMulC1 = ManualScalarMul(n);
+    kMulC1.k <== k;
+    kMulC1.x <== 5299619240641551281634865583518297030282874472190772894086521144482721001553;
+    kMulC1.y <== 16950150798460657717958625567821834550301663161624707787222815936182638968203;
 
-    component kQ = ManualScalarMul(n);
-    kQ.k <== k;
-    kQ.x <== qx;
-    kQ.y <== qy;
+    component kMulPublickey = ManualScalarMul(n);
+    kMulPublickey.k <== k;
+    kMulPublickey.x <== publicKey[0];
+    kMulPublickey.y <== publicKey[1];
 
-    component c2 = BabyAdd();
-    c2.x1 <== mx;
-    c2.y1 <== my;
-    c2.x2 <== kQ.xout;
-    c2.y2 <== kQ.yout;
+    component calculateC2 = BabyAdd();
+    calculateC2.x1 <== m[0];
+    calculateC2.y1 <== m[1];
+    calculateC2.x2 <== kMulPublickey.xout;
+    calculateC2.y2 <== kMulPublickey.yout;
 
-    c1.xout === c1x;
-    c1.yout === c1y;
-    c2.xout === c2x;
-    c2.yout === c2y;
+    kMulC1.xout === c1[0];
+    kMulC1.yout === c1[1];
+    calculateC2.xout === c2[0];
+    calculateC2.yout === c2[1];
 }
 
-component main {public [qx, qy, c1x, c1y, c2x, c2y]} = ECElGamalEncryptBabyJubjub(256);
+component main {public [publicKey, c1, c2]} = ECElGamalEncryptBabyJubjub(256);

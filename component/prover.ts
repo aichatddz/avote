@@ -1,6 +1,7 @@
 import { buildBabyjub, Point } from "circomlibjs";
 import { ethers, BigNumberish } from "ethers";
 import * as snarkjs from "snarkjs";
+import * as util from "./util";
 import { Voter$Type } from "../artifacts/contracts/implement/voter.sol/Voter";
 import { Abi, GetContractReturnType, publicActions } from "viem";
 import { getProof } from "viem/_types/actions/public/getProof";
@@ -64,13 +65,9 @@ export abstract class Prover<PublicSignalLength extends number = number> {
 
 export class Voter extends Prover<6> {
     private randomK: bigint;
-    public constructor(randomK: bigint | null) {
+    public constructor(randomK: bigint) {
         super("./circom/compile/vote_js/vote.wasm", "./circom/vote_0001.zkey", 6);
-        if (randomK == null) {
-            this.randomK = ethers.toBigInt( ethers.randomBytes(32) );
-        } else {
-            this.randomK = randomK;
-        }
+        this.randomK = randomK;
     }
     async createSignals(params: CreateVoteSignalsParam): Promise<snarkjs.CircuitSignals> {
         const curve = await buildBabyjub();
@@ -80,14 +77,10 @@ export class Voter extends Prover<6> {
         const c2: Point = curve.addPoint(m, curve.mulPointEscalar(params.publicKey, k));
         return {
             k:   k.toString(2).padStart(256,'0').split('').map(Number),
-            qx:  curve.F.toString(params.publicKey[0]),
-            qy:  curve.F.toString(params.publicKey[1]),
-            c1x: curve.F.toString(c1[0]),
-            c1y: curve.F.toString(c1[1]),
-            c2x: curve.F.toString(c2[0]),
-            c2y: curve.F.toString(c2[1]),
-            mx:  curve.F.toString(m[0]),
-            my:  curve.F.toString(m[1]),
+            publicKey: [ curve.F.toString(params.publicKey[0]), curve.F.toString(params.publicKey[1]) ],
+            c1: [ curve.F.toString(c1[0]), curve.F.toString(c1[1]) ],
+            c2: [curve.F.toString(c2[0]), curve.F.toString(c2[1]) ],
+            m: [ curve.F.toString(m[0]), curve.F.toString(m[1]) ],
         };    
     }
 }
@@ -101,8 +94,7 @@ export class SubmitPublicKey extends Prover<2> {
         const publicKey: Point = curve.mulPointEscalar(curve.Base8, params.privateKey);
         return {
             d:   params.privateKey.toString(2).padStart(256,'0').split('').map(Number),
-            qx:  curve.F.toString(publicKey[0]),
-            qy:  curve.F.toString(publicKey[1]),
+            publicKey:  [curve.F.toString(publicKey[0]), curve.F.toString(publicKey[1])],
         };
     }
 }
@@ -116,12 +108,9 @@ export class Decrypt extends Prover<6> {
         const dMulC1: Point = curve.mulPointEscalar(params.c1, params.privateKey);
         return {
             d:   params.privateKey.toString(2).padStart(256,'0').split('').map(Number),
-            qx:  curve.F.toString(params.publicKey[0]),
-            qy:  curve.F.toString(params.publicKey[1]),
-            c1x: curve.F.toString(params.c1[0]),
-            c1y: curve.F.toString(params.c1[1]),
-            dc1x: curve.F.toString(dMulC1[0]),
-            dc1y: curve.F.toString(dMulC1[1]),
+            publicKey: [ curve.F.toString(params.publicKey[0]), curve.F.toString(params.publicKey[1]) ],
+            c1: [curve.F.toString(params.c1[0]),  curve.F.toString(params.c1[1])],
+            dMulC1: [ curve.F.toString(dMulC1[0]), curve.F.toString(dMulC1[1]) ],
         };
     }
 }
