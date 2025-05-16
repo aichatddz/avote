@@ -50,5 +50,5 @@ export function decode(curve: BabyJub, dMulC1: BigPoint, c2: BigPoint): BigPoint
 }
 
 export function randomScalar(curve: BabyJub): bigint {
-    return ethers.toBigInt(ethers.randomBytes(32)) % curve.order;
+    return ethers.toBigInt(ethers.randomBytes(32)) % curve.subOrder;
 }
