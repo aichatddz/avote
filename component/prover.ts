@@ -76,7 +76,8 @@ export class Voter extends Prover<6> {
         const c1: Point = curve.mulPointEscalar(curve.Base8, k);
         const c2: Point = curve.addPoint(m, curve.mulPointEscalar(params.publicKey, k));
         return {
-            k:   k.toString(2).padStart(256,'0').split('').map(Number),
+            k2:   k.toString(2).padStart(252,'0').split('').map(Number),
+            randomK: k,
             publicKey: [ curve.F.toString(params.publicKey[0]), curve.F.toString(params.publicKey[1]) ],
             c1: [ curve.F.toString(c1[0]), curve.F.toString(c1[1]) ],
             c2: [curve.F.toString(c2[0]), curve.F.toString(c2[1]) ],
@@ -93,7 +94,8 @@ export class SubmitPublicKey extends Prover<2> {
         const curve = await buildBabyjub();
         const publicKey: Point = curve.mulPointEscalar(curve.Base8, params.privateKey);
         return {
-            d:   params.privateKey.toString(2).padStart(256,'0').split('').map(Number),
+            // d:   params.privateKey.toString(2).padStart(256,'0').split('').map(Number),
+            privateKey: params.privateKey,
             publicKey:  [curve.F.toString(publicKey[0]), curve.F.toString(publicKey[1])],
         };
     }
@@ -107,7 +109,8 @@ export class Decrypt extends Prover<6> {
         const curve = await buildBabyjub();
         const dMulC1: Point = curve.mulPointEscalar(params.c1, params.privateKey);
         return {
-            d:   params.privateKey.toString(2).padStart(256,'0').split('').map(Number),
+            // d:   params.privateKey.toString(2).padStart(256,'0').split('').map(Number),
+            privateKey: params.privateKey,
             publicKey: [ curve.F.toString(params.publicKey[0]), curve.F.toString(params.publicKey[1]) ],
             c1: [curve.F.toString(params.c1[0]),  curve.F.toString(params.c1[1])],
             dMulC1: [ curve.F.toString(dMulC1[0]), curve.F.toString(dMulC1[1]) ],
