@@ -36,11 +36,7 @@ describe("Verifier", function () {
 
     const publicClient = await hre.viem.getPublicClient();
     const curve = await buildBabyjub();
-
-    for (var i = 0; i < 8; i++) {
-      console.log(randomScalar(curve));
-    }
-
+    
     const counterTestValues: CounterTestValue[] = [
       {
         private: 735514173037608534735104653239571788205806618835123745487136276835914656619n,

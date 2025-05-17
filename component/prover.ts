@@ -76,7 +76,6 @@ export class Voter extends Prover<6> {
         const c1: Point = curve.mulPointEscalar(curve.Base8, k);
         const c2: Point = curve.addPoint(m, curve.mulPointEscalar(params.publicKey, k));
         return {
-            k2:   k.toString(2).padStart(252,'0').split('').map(Number),
             randomK: k,
             publicKey: [ curve.F.toString(params.publicKey[0]), curve.F.toString(params.publicKey[1]) ],
             c1: [ curve.F.toString(c1[0]), curve.F.toString(c1[1]) ],
