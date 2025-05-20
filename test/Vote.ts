@@ -32,7 +32,7 @@ describe("Verifier", function () {
     const voteVerifier = await hre.viem.deployContract("contracts/circuit/vote_verifier.sol:Groth16Verifier", [], {});
     const publicKeyVerifier = await hre.viem.deployContract("contracts/circuit/publickey_verifier.sol:Groth16Verifier", [], {});
     const decryptVerifier = await hre.viem.deployContract("contracts/circuit/decrypt_verifier.sol:Groth16Verifier", [], {});
-    const avote = await hre.viem.deployContract("Voter", [voteVerifier.address, publicKeyVerifier.address, decryptVerifier.address], {});
+    const avote = await hre.viem.deployContract("Avote", [voteVerifier.address, publicKeyVerifier.address, decryptVerifier.address], {});
 
     const publicClient = await hre.viem.getPublicClient();
     const curve = await buildBabyjub();
@@ -143,8 +143,10 @@ describe("Verifier", function () {
       y: 2084097603320654059057452933899276738950979811550339513244161863208586951653n,
     }
 
-    console.log("order: ", curve.order)
-    return { curve, avote, counterTestValues, voterPrivates, expectPublicKey, sumCipher, sumDecrypts, owner, otherAccount, publicClient };
+    const voteId = randomScalar(curve);
+    console.log(voteId);
+
+    return { curve, avote, counterTestValues, voterPrivates, expectPublicKey, sumCipher, sumDecrypts, voteId, owner, otherAccount, publicClient };
   }
 
   it("Should create the right random vote", async function () {
@@ -158,7 +160,7 @@ describe("Verifier", function () {
       value: v,
     });
 
-    const rsp = await fixture.avote.write.Vote(proof);
+    const rsp = await fixture.avote.write.Vote([fixture.voteId, ...proof]);
 
     await fixture.publicClient.waitForTransactionReceipt({hash: rsp});
     const voteEvents = await fixture.avote.getEvents.VoteLog();
@@ -174,7 +176,7 @@ describe("Verifier", function () {
         publicKey: fixture.expectPublicKey,
         value: fixture.voterPrivates[i].value,
       });  
-      const rsp = await fixture.avote.write.Vote(proof);
+      const rsp = await fixture.avote.write.Vote([fixture.voteId, ...proof]);
       await fixture.publicClient.waitForTransactionReceipt({hash: rsp});
       const voteEvents = await fixture.avote.getEvents.VoteLog();
       expect(voteEvents).to.have.lengthOf(1);
@@ -182,7 +184,7 @@ describe("Verifier", function () {
       expect(voteEvents[0].args[0]?.cipher.c2).to.deep.equals(fixture.voterPrivates[i].c2);
     }
     // test the contract storage
-    const votes = await fixture.avote.read.Votes();
+    const votes = await fixture.avote.read.Votes([fixture.voteId]);
     expect(votes).to.have.lengthOf(fixture.voterPrivates.length);
     for (let i in fixture.voterPrivates) {
       expect(votes[i].c1).to.deep.equals(fixture.voterPrivates[i].c1);
@@ -210,14 +212,14 @@ describe("Verifier", function () {
         publicKey: fixture.curve.mulPointEscalar(fixture.curve.Base8, fixture.counterTestValues[i].private),
         c1: sumCipher.c1,
       });
-      const rsp = await fixture.avote.write.Decrypt(proof);
+      const rsp = await fixture.avote.write.Decrypt([fixture.voteId, ...proof]);
 
       await fixture.publicClient.waitForTransactionReceipt({hash: rsp});
       const decryptEvents = await fixture.avote.getEvents.DecryptLog();
       expect(decryptEvents).to.have.lengthOf(1);
     }
 
-    const decryptPoints = await fixture.avote.read.DecryptPoints();
+    const decryptPoints = await fixture.avote.read.DecryptPoints([fixture.voteId]);
     expect(decryptPoints).to.have.lengthOf(fixture.counterTestValues.length);
     for (let i = 0; i < decryptPoints.length; i++) {
       expect(decryptPoints[i]).to.deep.equals(fixture.counterTestValues[i].dMulC1);
@@ -240,7 +242,7 @@ describe("Verifier", function () {
         privateKey: privateKey,
     });
 
-    const rsp = await fixture.avote.write.SubmitPublicKey(proof);
+    const rsp = await fixture.avote.write.SubmitPublicKey([fixture.voteId, ...proof]);
 
     await fixture.publicClient.waitForTransactionReceipt({hash: rsp});
     const voteEvents = await fixture.avote.getEvents.SubmitPublicKeyLog();
@@ -255,13 +257,13 @@ describe("Verifier", function () {
       const proof = await prover.prove({
         privateKey: fixture.counterTestValues[i].private,
       });
-      const rsp = await fixture.avote.write.SubmitPublicKey(proof);
+      const rsp = await fixture.avote.write.SubmitPublicKey([fixture.voteId, ...proof]);
       await fixture.publicClient.waitForTransactionReceipt({hash: rsp});
       const voteEvents = await fixture.avote.getEvents.SubmitPublicKeyLog();
       expect(voteEvents).to.have.lengthOf(1);
     }
 
-    const publicKeys = await fixture.avote.read.CounterPublicKeys()
+    const publicKeys = await fixture.avote.read.CounterPublicKeys([fixture.voteId]);
     let publicKeyPoints: Point[] = [];
     for (let i = 0; i < publicKeys.length; i++) {
       publicKeyPoints.push([
@@ -287,7 +289,7 @@ describe("Verifier", function () {
       c1: c1,
     });
 
-    const rsp = await fixture.avote.write.Decrypt(proof);
+    const rsp = await fixture.avote.write.Decrypt([fixture.voteId, ...proof]);
 
     await fixture.publicClient.waitForTransactionReceipt({hash: rsp});
     const voteEvents = await fixture.avote.getEvents.DecryptLog();
