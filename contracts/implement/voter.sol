@@ -5,6 +5,9 @@ import {IVoter, ICounter, Point, Cipher, ISponsor} from "../base/interfaces.sol"
 import {Groth16Verifier as VoteVerifier} from "../circuit/vote_verifier.sol";
 import {Groth16Verifier as PublicKeyVerifier} from "../circuit/publickey_verifier.sol";
 import {Groth16Verifier as DecryptVerifier} from "../circuit/decrypt_verifier.sol";
+import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts/utils/Strings.sol";
 
 struct VoteValue {
     Point publicKey;
@@ -25,16 +28,18 @@ event SubmitPublicKeyLog(Point);
 event DecryptLog(Point);
 event InitiateLog(uint256 indexed id);
 
-contract Avote is IVoter, ICounter, ISponsor {
+contract Avote is IVoter, ICounter, ISponsor, Initializable, OwnableUpgradeable  {
     VoteVerifier voteVerifier;
     PublicKeyVerifier publicKeyVerifier;
     DecryptVerifier decryptVerifier;
+    mapping (address=>bool) validCounters;
     mapping (uint256=>VoteInfo) voteInfos;  // mapping vote id to voteInfo
 
-    constructor(address _verifierAddr, address _publicKeyVerifier, address _decryptVerifier) {
+    constructor(address _verifierAddr, address _publicKeyVerifier, address _decryptVerifier) public initializer {
         voteVerifier = VoteVerifier(_verifierAddr);
         publicKeyVerifier = PublicKeyVerifier(_publicKeyVerifier);
         decryptVerifier = DecryptVerifier(_decryptVerifier);
+        __Ownable_init(_msgSender());
     }
 
     function Vote(uint256 id, uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[6] calldata _pubSignals) external {
@@ -60,6 +65,7 @@ contract Avote is IVoter, ICounter, ISponsor {
     }
 
     function SubmitPublicKey(uint256 id, uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[2] calldata _pubSignals) external payable {
+        require(validCounters[msg.sender] == true, string.concat("invalid counter: ", Strings.toHexString(uint256(uint160(msg.sender)), 20)));
         bool isVerified = publicKeyVerifier.verifyProof(_pA, _pB, _pC, _pubSignals);
         require(isVerified, "SubmitPublicKey proof failed");
         Point memory publicKey = Point({
@@ -101,5 +107,9 @@ contract Avote is IVoter, ICounter, ISponsor {
             decryptPoints: new Point[](0)
         });
         emit InitiateLog(id);
+    }
+
+    function AddCounter(address counter) external onlyOwner {
+        validCounters[counter] = true;
     }
 }

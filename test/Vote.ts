@@ -7,7 +7,7 @@ import hre from "hardhat";
 import { ethers, toBigInt } from "ethers";
 import { buildBabyjub, Point, BabyJub } from "circomlibjs";
 import { Prover, Voter, SubmitPublicKey, Decrypt } from "../component/prover";
-import { toBytes, fromBytes, NonceTooLowError } from 'viem'
+import { toBytes, fromBytes, NonceTooLowError, createPublicClient, createTestClient, http, walletActions } from 'viem'
 import { sumPoints, BigPoint, Cipher, toPoint, sumBigPoints, decode, toBigPoint, randomScalar} from "../component/util";
 
 interface VoterTestValue {
@@ -27,8 +27,9 @@ interface CounterTestValue {
 describe("Verifier", function () {
   async function deployFixture() {
     // Contracts are deployed using the first signer/account by default
-    const [owner, otherAccount] = await hre.viem.getWalletClients();
-
+    const accounts = await hre.viem.getWalletClients();
+    console.log(accounts.length);
+ 
     const voteVerifier = await hre.viem.deployContract("contracts/circuit/vote_verifier.sol:Groth16Verifier", [], {});
     const publicKeyVerifier = await hre.viem.deployContract("contracts/circuit/publickey_verifier.sol:Groth16Verifier", [], {});
     const decryptVerifier = await hre.viem.deployContract("contracts/circuit/decrypt_verifier.sol:Groth16Verifier", [], {});
@@ -36,6 +37,10 @@ describe("Verifier", function () {
 
     const publicClient = await hre.viem.getPublicClient();
     const curve = await buildBabyjub();
+
+    for (let i = 1; i <= 3; i++) {
+      await avote.write.AddCounter([accounts[i].account.address]);
+    }
     
     const counterTestValues: CounterTestValue[] = [
       {
@@ -144,9 +149,9 @@ describe("Verifier", function () {
     }
 
     const voteId = randomScalar(curve);
-    console.log(voteId);
+    // console.log(voteId);
 
-    return { curve, avote, counterTestValues, voterPrivates, expectPublicKey, sumCipher, sumDecrypts, voteId, owner, otherAccount, publicClient };
+    return { curve, avote, counterTestValues, voterPrivates, expectPublicKey, sumCipher, sumDecrypts, voteId, accounts, publicClient };
   }
 
   it("Should create the right random vote", async function () {
@@ -169,6 +174,7 @@ describe("Verifier", function () {
 
   it("Should add the right votes", async () => {
     const fixture = await loadFixture(deployFixture);
+
     // test the event
     for (let i in fixture.voterPrivates) {
       let prover = new Voter(fixture.voterPrivates[i].randomK);
@@ -236,13 +242,21 @@ describe("Verifier", function () {
 
   it("Should add the right random public key", async function() {
     const fixture = await loadFixture(deployFixture);
+
+    fixture.avote.write.AddCounter([fixture.accounts[1].account.address]);
+
     const privateKey: bigint = randomScalar(fixture.curve);
+
     let prover = new SubmitPublicKey();
     const proof = await prover.prove({
         privateKey: privateKey,
     });
 
-    const rsp = await fixture.avote.write.SubmitPublicKey([fixture.voteId, ...proof]);
+    let cli = await hre.viem.getContractAt("Avote", fixture.avote.address, {
+      client: { wallet: fixture.accounts[1]},
+    })
+    
+    const rsp = await cli.write.SubmitPublicKey([fixture.voteId, ...proof]);
 
     await fixture.publicClient.waitForTransactionReceipt({hash: rsp});
     const voteEvents = await fixture.avote.getEvents.SubmitPublicKeyLog();
@@ -257,9 +271,12 @@ describe("Verifier", function () {
       const proof = await prover.prove({
         privateKey: fixture.counterTestValues[i].private,
       });
-      const rsp = await fixture.avote.write.SubmitPublicKey([fixture.voteId, ...proof]);
+      let cli = await hre.viem.getContractAt("Avote", fixture.avote.address, {
+        client: { wallet: fixture.accounts[1]},
+      })
+      const rsp = await cli.write.SubmitPublicKey([fixture.voteId, ...proof]);
       await fixture.publicClient.waitForTransactionReceipt({hash: rsp});
-      const voteEvents = await fixture.avote.getEvents.SubmitPublicKeyLog();
+      const voteEvents = await cli.getEvents.SubmitPublicKeyLog();
       expect(voteEvents).to.have.lengthOf(1);
     }
 
