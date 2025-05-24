@@ -6,174 +6,110 @@ import { expect } from "chai";
 import hre from "hardhat";
 import { ethers, toBigInt } from "ethers";
 import { buildBabyjub, Point, BabyJub } from "circomlibjs";
-import { Prover, Voter, SubmitPublicKey, Decrypt } from "../component/prover";
+import { Prover, Voter, SubmitPublicKey, Decrypt, CheckSum } from "../component/prover";
 import { toBytes, fromBytes, NonceTooLowError, createPublicClient, createTestClient, http, walletActions } from 'viem'
-import { sumPoints, BigPoint, Cipher, toPoint, sumBigPoints, decode, toBigPoint, randomScalar} from "../component/util";
-
-interface VoterTestValue {
-  private: bigint;  // it's not used yet
-  value: number;
-  randomK: bigint;
-  c1: BigPoint;
-  c2: BigPoint;
-}
-
-interface CounterTestValue {
-  private: bigint;
-  // public: BigPoint;
-  dMulC1: BigPoint;
-}
+import { sumPoints, BigPoint, Cipher, toPoint, sumBigPoints, decode, toBigPoint, randomScalar, Proof} from "../component/util";
+import * as fixtureTest from "./fixture"
+import { bigint } from "hardhat/internal/core/params/argumentTypes";
 
 describe("Verifier", function () {
-  async function deployFixture() {
-    // Contracts are deployed using the first signer/account by default
-    const accounts = await hre.viem.getWalletClients();
-    console.log(accounts.length);
- 
-    const voteVerifier = await hre.viem.deployContract("contracts/circuit/vote_verifier.sol:Groth16Verifier", [], {});
-    const publicKeyVerifier = await hre.viem.deployContract("contracts/circuit/publickey_verifier.sol:Groth16Verifier", [], {});
-    const decryptVerifier = await hre.viem.deployContract("contracts/circuit/decrypt_verifier.sol:Groth16Verifier", [], {});
-    const avote = await hre.viem.deployContract("Avote", [voteVerifier.address, publicKeyVerifier.address, decryptVerifier.address], {});
+  it("Should initiate a vote successfully", async function () {
+    const fixture = await loadFixture(fixtureTest.deployFixture);
+    let initiatedRsp = await fixture.accounts[4].writeContract({
+      address: fixture.avote.address,
+      abi: fixture.avote.abi,
+      functionName: 'Initiate',
+      args: [[
+        fixture.accounts[5].account.address,
+        fixture.accounts[6].account.address,
+        fixture.accounts[7].account.address,
+        fixture.accounts[8].account.address,
+        fixture.accounts[9].account.address,
+      ], fixture.voteId, 3n],
+      value: 1n
+    })
+    await fixture.publicClient.waitForTransactionReceipt({hash: initiatedRsp});
+    const event = await fixture.avote.getEvents.InitiateLog();
+    expect(event).to.have.lengthOf(1);
+    expect(await fixture.avote.read.GetVoteInfo([fixture.voteId])).to.be.deep.equals(fixtureTest.InitiatedStateStart());
+  })
 
-    const publicClient = await hre.viem.getPublicClient();
-    const curve = await buildBabyjub();
+  it("Should change the state to voting successfully", async function () {
+    const fixture = await loadFixture(fixtureTest.deployFixture);
+    await fixture.avote.write.SetTestState([fixture.voteId, fixtureTest.InitiatedStateEnd()]);
 
-    for (let i = 1; i <= 3; i++) {
-      await avote.write.AddCounter([accounts[i].account.address]);
-    }
-    
-    const counterTestValues: CounterTestValue[] = [
-      {
-        private: 735514173037608534735104653239571788205806618835123745487136276835914656619n,
-        dMulC1: {
-          x: 17586405391974699223143074723589877012749432494028331276422099265030666348654n,
-          y: 16437489348796400388617656096621684919302650347297451868090043575543022655568n,
-        }
-      },
-      {
-        private: 632366879893181405087379695101455452961379375663675034682573978561129264084n,
-        dMulC1: {
-          x:21084389068483219027875384063746789633976695523374699817104638034976281328947n,
-          y:2508542504771750605747188674486627963376873373636006411342463972362506706028n,
-        }
-      },
-      {
-        private: 2309680827062359428527157418503620910777834679952307807722172278573486636784n,
-        dMulC1: {
-          x: 17450306543244095259989696499644199062146864895587615636847394954930251920914n,
-          y: 1247813636160191280768694652694491180916599064873943164580769409637792978872n,
-        }
-      },
-    ]
+    let proofs: Proof[] = [];
+    let windowSums: BigPoint[] = [];
 
-    const voterPrivates: VoterTestValue[] = [
-      {
-        private: 2230359128765178667009492279002232690348502915904860098119029361924741268331n, 
-        value: 1, 
-        randomK: 1186514429774673263045386838204114554872366147750302254896049112187317603883n,
-        c1: {
-          x: 4927186078240140046265353961886559884626197109666961159300140392289670006231n, 
-          y: 8020290187704485342258828070343193949044353401393013934184033625253291783851n,
-        },
-        c2: {
-          x: 5095231844120880793323863218492658424924250123359868729330699495771584066623n, 
-          y: 18814646589350445839362184305043626641028853182367201556837650789424538027246n,
+    let lastSum: BigPoint = {x: 0n, y: 1n};
+    let keys = fixtureTest.InitiatedStateEnd().counterPublicKeys;
+    let sumPoint = toPoint(fixture.curve, lastSum);
+    const windowSize = 32;
+    for (let i = 0; i < Math.floor((keys.length - 1) / (windowSize-1)) + 1; i++) {
+      let points: BigPoint[] = [];
+      for (let j = 0; j < (windowSize-1); j++) {
+        if (i*(windowSize-1)+j >= keys.length) {
+          points.push({
+            x: 0n,
+            y: 1n,
+          });
+        } else {
+          points.push({
+            x: keys[i*(windowSize-1) + j].x,
+            y: keys[i*(windowSize-1) + j].y
+          });
         }
-      },
-      {
-        private: 2307068043429434355608527159120511283714965558313529488750141847727947338047n, 
-        value: 2, 
-        randomK: 2304228914364770495375489776807601134895615849297190862334840635916175840578n,
-        c1: {
-          x: 5950138701138748602872839146346803612147640892285571687315568280501474776667n, 
-          y: 19801382270819322338371924741668328091603279883798289397156548146655634279043n,
-        },
-        c2: {
-          x: 19551798702234497938852910329658283315281403366597685922309994172137949210470n, 
-          y: 9589002976014871039477560575267955571838388695098661656083909249518179935423n,
-        }
-      },
-      {
-        private: 169597424537300259879951871106718979281962930472519670071286047737098634808n, 
-        value: 3,
-        randomK: 1733110834937671739964741288065960546195549429679506389541532944902961390217n,
-        c1: {
-          x: 3547530953419371257734676976196493220667798891270180410274053106392379699126n, 
-          y: 2857669480309460825166048718616540765211657179603511183626401637573573564946n,
-        },
-        c2: {
-          x: 14840281706620884291616083736499460613754174344028022110529763243226189716967n, 
-          y: 8110729206842040793978065050878728181007374289365506282021599459075923132902n,
-        }
-      },
-      {
-        private: 475544391661551677346151511013601989982873960504037718549505370862099543606n, 
-        value: 1, 
-        randomK:  1464192984160956163854823254075844836430673130662993778972848362882461520655n,
-        c1: {
-          x: 4187293818286361699895632992775746231568694846289580904069535219438641015339n, 
-          y: 17641463013099135835269526991334333119632839997477541661000959287658836165613n,
-        },
-        c2: {
-          x: 4316987542220216246928612834392827007342442537462770867984146788137032993646n, 
-          y: 7100926374345897409515537554400069511635449901388748984630740068262828595085n,
-        }
-      },
-      {
-        private: 546372505267749274698143840508932057256023889190772591914061187395605296852n, 
-        value: 1, 
-        randomK: 842073200858079431488570481041966272275065633623425498337949642654812475648n,
-        c1: {
-          x: 1972411620866860113407425005248654798556739856996899136222612442639314288355n, 
-          y: 1373356950687444176160227572558197519787106187137745243099578692387192387536n,
-        },
-        c2: {
-          x: 8264426594767412502559006948788934129853133604300385464975597675885461845939n, 
-          y: 690409446320898477308298715348859559171807148545752497181437933949644695629n,
-        }
+        sumPoint = fixture.curve.addPoint(sumPoint, toPoint(fixture.curve, points[j]));
       }
-    ]
-    const expectPublicKey: Point = [
-      curve.F.e(17562281052541849814619194517171420429774894242466780171322661757215271005933n.toString()),
-      curve.F.e(5545643084915208416594058274347129551972220545965249783234145634433536213542n.toString()),
-    ];
 
-    const sumCipher: Cipher = {
-      c1: [curve.F.e(4581260430175070783408571085641532620249784736829700533832715250107242346585n.toString()), curve.F.e(14882391343821010434428845766509207672190941494785204334611706690448955976844n.toString())],
-      c2: [curve.F.e(8331369744015922138462484517269120738268013900871287974180609798583516246958n.toString()), curve.F.e(10188787274520102679995611343114671845066683377365217292362416829258517313708n.toString())],
+      let outSum: BigPoint = toBigPoint(fixture.curve, sumPoint);
+      let prover = new CheckSum();
+      const proof = await prover.prove({
+        lastSum: lastSum,
+        points: points,
+        outSum: outSum,
+      });
+
+      proofs.push({
+        a: proof[0],
+        b: proof[1],
+        c: proof[2],
+      })
+      windowSums.push({
+        x: outSum.x,
+        y: outSum.y,
+      })
+      lastSum = toBigPoint(fixture.curve, sumPoint);
     }
-
-    const sumDecrypts: BigPoint = {
-      x: 1617871771995441095161541924150672646449831557532794326082971468472488563059n,
-      y: 2084097603320654059057452933899276738950979811550339513244161863208586951653n,
-    }
-
-    const voteId = randomScalar(curve);
-    // console.log(voteId);
-
-    return { curve, avote, counterTestValues, voterPrivates, expectPublicKey, sumCipher, sumDecrypts, voteId, accounts, publicClient };
-  }
-
-  it("Should create the right random vote", async function () {
-    const fixture = await loadFixture(deployFixture);
-    const q: Point = fixture.expectPublicKey;  // public key
-    const v = 3;  // vote value
-
-    let prover = new Voter(randomScalar(fixture.curve));
-    const proof = await prover.prove({
-      publicKey: q,
-      value: v,
-    });
-
-    const rsp = await fixture.avote.write.Vote([fixture.voteId, ...proof]);
-
+    let rsp = await fixture.avote.write.ChangeStateToVoting([fixture.voteId, proofs, windowSums]);    
     await fixture.publicClient.waitForTransactionReceipt({hash: rsp});
-    const voteEvents = await fixture.avote.getEvents.VoteLog();
-    expect(voteEvents).to.have.lengthOf(1);
+    const event = await fixture.avote.getEvents.ChangeStateLog();
+    expect(event).to.have.lengthOf(1);
+    expect(await fixture.avote.read.GetVoteInfo([fixture.voteId])).to.be.deep.equals(fixtureTest.VotingStateStart());
+  })
+
+  it("Should submit the right votes", async () => {
+    const fixture = await loadFixture(fixtureTest.deployFixture);
+    await fixture.avote.write.SetTestState([fixture.voteId, fixtureTest.VotingStateStart()]);
+    for (let i in fixture.voterPrivates) {
+      let prover = new Voter(fixture.voterPrivates[i].randomK);
+      const proof = await prover.prove({
+        publicKey: fixture.expectPublicKey,
+        value: fixture.voterPrivates[i].value,
+      });  
+      const rsp = await fixture.avote.write.Vote([fixture.voteId, ...proof]);
+      await fixture.publicClient.waitForTransactionReceipt({hash: rsp});
+      const voteEvents = await fixture.avote.getEvents.VoteLog();
+      expect(voteEvents).to.have.lengthOf(1);
+      expect(voteEvents[0].args[0]?.cipher.c1).to.deep.equals(fixture.voterPrivates[i].c1);
+      expect(voteEvents[0].args[0]?.cipher.c2).to.deep.equals(fixture.voterPrivates[i].c2);
+    }
+    expect(await fixture.avote.read.GetVoteInfo([fixture.voteId])).to.be.deep.equals(fixtureTest.VotingStateEnd());
   })
 
   it("Should add the right votes", async () => {
-    const fixture = await loadFixture(deployFixture);
+    const fixture = await loadFixture(fixtureTest.deployFixture);
+    await fixture.avote.write.SetTestState([fixture.voteId, fixtureTest.VotingStateStart()]);
 
     // test the event
     for (let i in fixture.voterPrivates) {
@@ -190,11 +126,11 @@ describe("Verifier", function () {
       expect(voteEvents[0].args[0]?.cipher.c2).to.deep.equals(fixture.voterPrivates[i].c2);
     }
     // test the contract storage
-    const votes = await fixture.avote.read.Votes([fixture.voteId]);
-    expect(votes).to.have.lengthOf(fixture.voterPrivates.length);
+    let voteInfo = await fixture.avote.read.GetVoteInfo([fixture.voteId]);
+    expect(voteInfo.votes).to.have.lengthOf(fixture.voterPrivates.length);
     for (let i in fixture.voterPrivates) {
-      expect(votes[i].c1).to.deep.equals(fixture.voterPrivates[i].c1);
-      expect(votes[i].c2).to.deep.equals(fixture.voterPrivates[i].c2);
+      expect(voteInfo.votes[i].cipher.c1).to.deep.equals(fixture.voterPrivates[i].c1);
+      expect(voteInfo.votes[i].cipher.c2).to.deep.equals(fixture.voterPrivates[i].c2);
     }
 
     // test the sum of c1 and the sum of c2
@@ -225,13 +161,13 @@ describe("Verifier", function () {
       expect(decryptEvents).to.have.lengthOf(1);
     }
 
-    const decryptPoints = await fixture.avote.read.DecryptPoints([fixture.voteId]);
-    expect(decryptPoints).to.have.lengthOf(fixture.counterTestValues.length);
-    for (let i = 0; i < decryptPoints.length; i++) {
-      expect(decryptPoints[i]).to.deep.equals(fixture.counterTestValues[i].dMulC1);
+    voteInfo = await fixture.avote.read.GetVoteInfo([fixture.voteId]);
+    expect(voteInfo.decryptPoints).to.have.lengthOf(fixture.counterTestValues.length);
+    for (let i = 0; i < voteInfo.decryptPoints.length; i++) {
+      expect(voteInfo.decryptPoints[i]).to.deep.equals(fixture.counterTestValues[i].dMulC1);
     }
 
-    const sumDecrypt = sumBigPoints(fixture.curve, decryptPoints);
+    const sumDecrypt = sumBigPoints(fixture.curve, voteInfo.decryptPoints);
     expect(sumDecrypt).to.deep.equals(fixture.sumDecrypts);
     const plainPoint = decode(fixture.curve, sumDecrypt, toBigPoint(fixture.curve, sumCipher.c2));
 
@@ -240,31 +176,9 @@ describe("Verifier", function () {
 
   })
 
-  it("Should add the right random public key", async function() {
-    const fixture = await loadFixture(deployFixture);
-
-    fixture.avote.write.AddCounter([fixture.accounts[1].account.address]);
-
-    const privateKey: bigint = randomScalar(fixture.curve);
-
-    let prover = new SubmitPublicKey();
-    const proof = await prover.prove({
-        privateKey: privateKey,
-    });
-
-    let cli = await hre.viem.getContractAt("Avote", fixture.avote.address, {
-      client: { wallet: fixture.accounts[1]},
-    })
-    
-    const rsp = await cli.write.SubmitPublicKey([fixture.voteId, ...proof]);
-
-    await fixture.publicClient.waitForTransactionReceipt({hash: rsp});
-    const voteEvents = await fixture.avote.getEvents.SubmitPublicKeyLog();
-    expect(voteEvents).to.have.lengthOf(1);
-  })
-
-  it("Should add the right multi-public key", async function () {
-    const fixture = await loadFixture(deployFixture);
+  it("Should add the counter's public keys correctly", async function () {
+    const fixture = await loadFixture(fixtureTest.deployFixture);
+    await fixture.avote.write.SetTestState([fixture.voteId, fixtureTest.InitiatedStateStart()]);
 
     let prover = new SubmitPublicKey();
     for (let i = 0; i < fixture.counterTestValues.length; i++) {
@@ -280,20 +194,21 @@ describe("Verifier", function () {
       expect(voteEvents).to.have.lengthOf(1);
     }
 
-    const publicKeys = await fixture.avote.read.CounterPublicKeys([fixture.voteId]);
+    const voteInfo = await fixture.avote.read.GetVoteInfo([fixture.voteId]);
     let publicKeyPoints: Point[] = [];
-    for (let i = 0; i < publicKeys.length; i++) {
+    for (let i = 0; i < voteInfo.counterPublicKeys.length; i++) {
       publicKeyPoints.push([
-        fixture.curve.F.e(publicKeys[i].x.toString()),
-        fixture.curve.F.e(publicKeys[i].y.toString()),
+        fixture.curve.F.e(voteInfo.counterPublicKeys[i].x.toString()),
+        fixture.curve.F.e(voteInfo.counterPublicKeys[i].y.toString()),
       ])
     }
     const publicKey = await sumPoints(fixture.curve, publicKeyPoints);
     expect(publicKey).to.deep.equals(fixture.expectPublicKey);
+    expect(await fixture.avote.read.GetVoteInfo([fixture.voteId])).to.deep.equals(fixtureTest.InitiatedStateEnd());
   })
 
   it("Should add the right decryption", async function() {
-    const fixture = await loadFixture(deployFixture);
+    const fixture = await loadFixture(fixtureTest.deployFixture);
     const privateKey: bigint = randomScalar(fixture.curve);
     const publicKey: Point = fixture.curve.mulPointEscalar(fixture.curve.Base8, privateKey);
     const k: bigint = randomScalar(fixture.curve);

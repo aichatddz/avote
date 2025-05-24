@@ -3,6 +3,7 @@ pragma circom 2.0.0;
 include "../node_modules/circomlib/circuits/babyjub.circom";
 
 template CounterAddPublicKey(n) {
+    assert(n<253);
     signal input publicKey[2];    // public key
     signal input privateKey;
 

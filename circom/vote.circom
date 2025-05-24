@@ -4,6 +4,7 @@ include "../node_modules/circomlib/circuits/babyjub.circom";
 include "../node_modules/circomlib/circuits/escalarmulany.circom";
 
 template Vote(n) {
+    assert(n<253);
     signal input publicKey[2];
     signal input c1[2];
     signal input c2[2];
