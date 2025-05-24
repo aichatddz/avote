@@ -1,9 +1,16 @@
 import {Point, buildBabyjub, BabyJub} from "circomlibjs"
 import {ethers} from "ethers"
+import { bigint } from "hardhat/internal/core/params/argumentTypes";
 
 export interface BigPoint {
     x: bigint;
     y: bigint;
+}
+
+export interface Proof {
+    a: [bigint, bigint];
+    b: [[bigint, bigint], [bigint, bigint]];
+    c: [bigint, bigint];
 }
 
 export function toBigPoint(curve: BabyJub, p: Point): BigPoint {

@@ -1,10 +1,6 @@
 import { buildBabyjub, Point } from "circomlibjs";
-import { ethers, BigNumberish } from "ethers";
 import * as snarkjs from "snarkjs";
-import * as util from "./util";
-import { Voter$Type } from "../artifacts/contracts/implement/voter.sol/Voter";
-import { Abi, GetContractReturnType, publicActions } from "viem";
-import { getProof } from "viem/_types/actions/public/getProof";
+import { BigPoint } from "./util";
 
 interface BaseCreateSignalParam {
 
@@ -24,6 +20,12 @@ interface CreateDecryptSignalsParam {
     privateKey: bigint;
     publicKey: Point;
     c1: Point;
+}
+
+interface CreateCheckSumParam {
+    lastSum: BigPoint;
+    points: BigPoint[];
+    outSum: BigPoint;
 }
 
 export abstract class Prover<PublicSignalLength extends number = number> {
@@ -55,7 +57,7 @@ export abstract class Prover<PublicSignalLength extends number = number> {
         _pA: [bigint, bigint],
         _pB: [[bigint, bigint], [bigint, bigint]],
         _pC: [bigint, bigint],
-        _pubSignals: BigNumberishTuple<PublicSignalLength>,
+        _pubSignals: any,
       ]>{
         const signals = await this.createSignals(params);
         const {proof, publicSignals} = await this.createProve(signals);
@@ -114,6 +116,31 @@ export class Decrypt extends Prover<6> {
             c1: [curve.F.toString(params.c1[0]),  curve.F.toString(params.c1[1])],
             dMulC1: [ curve.F.toString(dMulC1[0]), curve.F.toString(dMulC1[1]) ],
         };
+    }
+}
+
+export class CheckSum extends Prover<66> {
+    public constructor() {
+        super("./circom/compile/check_sum_js/check_sum.wasm", "./circom/check_sum_0001.zkey", 66);
+    }
+    async createSignals(params: CreateCheckSumParam): Promise<snarkjs.CircuitSignals> {
+        const curve = await buildBabyjub();
+        let points: bigint[][] = [[params.lastSum.x, params.lastSum.y]];
+        for (let i: number = 0; i < params.points.length; i++) {
+            points.push([params.points[i].x, params.points[i].y]);
+        }
+        return {
+            points: points,
+            sum: [params.outSum.x, params.outSum.y],
+        }
+        // const dMulC1: Point = curve.mulPointEscalar(params.c1, params.privateKey);
+        // return {
+        //     // d:   params.privateKey.toString(2).padStart(256,'0').split('').map(Number),
+        //     privateKey: params.privateKey,
+        //     publicKey: [ curve.F.toString(params.publicKey[0]), curve.F.toString(params.publicKey[1]) ],
+        //     c1: [curve.F.toString(params.c1[0]),  curve.F.toString(params.c1[1])],
+        //     dMulC1: [ curve.F.toString(dMulC1[0]), curve.F.toString(dMulC1[1]) ],
+        // };
     }
 }
 

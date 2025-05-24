@@ -3,7 +3,8 @@ pragma circom 2.0.0;
 include "../node_modules/circomlib/circuits/babyjub.circom";
 include "../node_modules/circomlib/circuits/escalarmulany.circom";
 
-template ECElGamalDecrypt(n) {
+template Decrypt(n) {
+    assert(n<253);
     signal input publicKey[2];    // public key
     signal input c1[2];
     signal input privateKey;      // private key
@@ -27,4 +28,4 @@ template ECElGamalDecrypt(n) {
     mul.out === dMulC1;
 }
 
-component main {public [publicKey, c1, dMulC1]} = ECElGamalDecrypt(252);
+component main {public [publicKey, c1, dMulC1]} = Decrypt(252);
