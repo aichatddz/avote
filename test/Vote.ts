@@ -211,6 +211,24 @@ describe("Verifier", function () {
     expect(await fixture.avote.read.GetVoteInfo([fixture.voteId])).to.deep.equals(fixtureTest.InitiatedStateEnd());
   })
 
+  it("Counter should decrypt the tally correctly", async ()=> {
+    const fixture = await loadFixture(fixtureTest.deployFixture);
+    await fixture.avote.write.SetTestState([fixture.voteId, fixtureTest.TallyingStateStart()]);
+    for (let i = 0; i < fixture.counterTestValues.length; i++) {
+      let prover = new Decrypt();
+      const proof = await prover.prove({
+        privateKey: fixture.counterTestValues[i].private,
+        publicKey: fixture.curve.mulPointEscalar(fixture.curve.Base8, fixture.counterTestValues[i].private),
+        c1: Util.toPoint(fixture.curve, fixtureTest.TallyingStateStart().sumVotes.c1),
+      });
+      const rsp = await fixture.avote.write.Decrypt([fixture.voteId, ...proof]);
+      await fixture.publicClient.waitForTransactionReceipt({hash: rsp});
+      const decryptEvents = await fixture.avote.getEvents.DecryptLog();
+      expect(decryptEvents).to.have.lengthOf(1);
+    }
+    expect(await fixture.avote.read.GetVoteInfo([fixture.voteId])).to.deep.equals(fixtureTest.TallyingStateEnd());
+  })
+
   it("Should add the right decryption", async function() {
     const fixture = await loadFixture(fixtureTest.deployFixture);
     const privateKey: bigint = randomScalar(fixture.curve);
