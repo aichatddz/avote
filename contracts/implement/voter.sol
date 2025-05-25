@@ -197,30 +197,6 @@ contract Avote is IVoter, ICounter, ISponsor, Initializable, OwnableUpgradeable 
         require(verifySum(proofsC1, c1Points), "check the sum of c1 failed");
         require(verifySum(proofsC2, c2Points), "check the sum of c2 failed");
 
-        // for (uint256 t = 0; t < 2; t++) {
-        //     uint256 lastX = 0;
-        //     uint256 lastY = 1;
-        //     for (uint256 i = 0; i < proofs[t].length; i++) {
-        //         uint256[PUBLIC_SIGNAL_SIZE] memory publicSignal;
-        //         publicSignal[0] = lastX;
-        //         publicSignal[1] = lastY;
-        //         for (uint256 j = 0; j < WINDOW_SIZE - 1; j++) {
-        //             if (i*(WINDOW_SIZE - 1)+j < voteInfos[id].ballots.length) {
-        //                 publicSignal[(j+1)*2] = ballotsPoint(id, i*(WINDOW_SIZE - 1)+j, t).x; // voteInfos[id].ballots[i*(WINDOW_SIZE - 1)+j].c1.x;
-        //                 publicSignal[(j+1)*2+1] = ballotsPoint(id, i*(WINDOW_SIZE - 1)+j, t).y; // voteInfos[id].ballots[i*(WINDOW_SIZE - 1)+j].c1.y;
-        //             } else {
-        //                 publicSignal[(j+1)*2] = 0;
-        //                 publicSignal[(j+1)*2+1] = 1;
-        //             }
-        //         }
-        //         publicSignal[WINDOW_SIZE*2] = windowSums[t][i].x;
-        //         publicSignal[WINDOW_SIZE*2+1] = windowSums[t][i].y;
-        //         bool isVerified = sumVerifier.verifyProof(proofs[t][i].a, proofs[t][i].b, proofs[t][i].c, publicSignal);
-        //         require(isVerified, "check the sum of public key failed");
-        //         lastX = windowSums[t][i].x;
-        //         lastY = windowSums[t][i].y;
-        //     }
-        // }
         voteInfos[id].state = STATE_TALLYING;
         voteInfos[id].sumVotes = Cipher({
             c1: Point({

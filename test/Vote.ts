@@ -55,6 +55,7 @@ describe("Verifier", function () {
       });
     }
     let rsp = await fixture.avote.write.ChangeStateToVoting([fixture.voteId, p]);    
+
     await fixture.publicClient.waitForTransactionReceipt({hash: rsp});
     const event = await fixture.avote.getEvents.ChangeStateLog();
     expect(event).to.have.lengthOf(1);
