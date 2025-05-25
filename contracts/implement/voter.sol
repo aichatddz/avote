@@ -10,11 +10,6 @@ import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Own
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 
-// struct VoteValue {
-//     Point publicKey;
-//     Cipher cipher;
-// }
-
 struct VoteInfo {
     address[] candidates;
     address[] voters;
@@ -26,12 +21,18 @@ struct VoteInfo {
     uint256 expiredBlock;
     Point sumPublicKey;
     Cipher sumVotes;
+    Point decryptResultPoint;
 }
 
 struct Proof {
     uint[2] a;
     uint[2][2] b;
     uint[2] c;
+}
+
+struct SumProof {
+    Proof proof;
+    Point sum;
 }
 
 event VoteLog(address voter);
@@ -46,6 +47,8 @@ contract Avote is IVoter, ICounter, ISponsor, Initializable, OwnableUpgradeable 
     uint8 private constant STATE_INITIATED = 1;
     uint8 private constant STATE_VOTING = 2;
     uint8 private constant STATE_TALLYING = 3;
+    uint8 private constant STATE_PUBLISHED = 3;
+    
     uint256 private constant WINDOW_SIZE = 32;
     uint256 private constant PUBLIC_SIGNAL_SIZE = WINDOW_SIZE * 2+ 2;
     Point private ZERO_POINT = Point({x: 0, y: 1});
@@ -120,7 +123,8 @@ contract Avote is IVoter, ICounter, ISponsor, Initializable, OwnableUpgradeable 
             decryptPoints: new Point[](0),
             expiredBlock: block.number + initiateStateBlockNumbers,
             sumPublicKey: Point({x: 0, y: 1}),
-            sumVotes: Cipher({c1: ZERO_POINT, c2: ZERO_POINT})
+            sumVotes: Cipher({c1: ZERO_POINT, c2: ZERO_POINT}),
+            decryptResultPoint: Point({x: 0, y: 1})
         });
         emit ChangeStateLog(id, STATE_INITIATED);
     }
@@ -148,40 +152,22 @@ contract Avote is IVoter, ICounter, ISponsor, Initializable, OwnableUpgradeable 
         validCounters.push(counter);
     }
 
-    function ChangeStateToVoting(uint256 id, Proof[] calldata proofs, Point[] calldata windowSums) external {
+    function ChangeStateToVoting(uint256 id, SumProof[] calldata sumProofs) external {
         require(voteInfos[id].state == STATE_INITIATED, "state is not initiated");
         require(validCounters.length == voteInfos[id].counterPublicKeys.length || 
             voteInfos[id].expiredBlock <= block.number, "cannot change state yet");
-        require(proofs.length == windowSums.length, "the proofs' length is not equal as the windowSums' length");
-        require((voteInfos[id].counterPublicKeys.length-1) / (WINDOW_SIZE-1) + 1 == proofs.length, "the proofs' length is not match with the counters' number");
+        require((voteInfos[id].counterPublicKeys.length-1) / (WINDOW_SIZE-1) + 1 == sumProofs.length, "the proofs' length is not match with the counters' number");
 
-        uint256 lastX = 0;
-        uint256 lastY = 1;
-        for (uint256 i = 0; i < proofs.length; i++) {
-            uint256[PUBLIC_SIGNAL_SIZE] memory publicSignal;
-            publicSignal[0] = lastX;
-            publicSignal[1] = lastY;
-            for (uint256 j = 0; j < WINDOW_SIZE - 1; j++) {
-                if (i*(WINDOW_SIZE - 1)+j < voteInfos[id].counterPublicKeys.length) {
-                    publicSignal[(j+1)*2] = voteInfos[id].counterPublicKeys[i*(WINDOW_SIZE - 1)+j].x;
-                    publicSignal[(j+1)*2+1] = voteInfos[id].counterPublicKeys[i*(WINDOW_SIZE - 1)+j].y;
-                } else {
-                    publicSignal[(j+1)*2] = 0;
-                    publicSignal[(j+1)*2+1] = 1;
-                }
-            }
-            publicSignal[WINDOW_SIZE*2] = windowSums[i].x;
-            publicSignal[WINDOW_SIZE*2+1] = windowSums[i].y;
-            bool isVerified = sumVerifier.verifyProof(proofs[i].a, proofs[i].b, proofs[i].c, publicSignal);
-            require(isVerified, "check the sum of public key failed");
-            lastX = windowSums[i].x;
-            lastY = windowSums[i].y;
+        Point[] memory points = new Point[](voteInfos[id].counterPublicKeys.length);
+        for (uint256 i = 0; i < voteInfos[id].counterPublicKeys.length; i++) {
+            points[i] = voteInfos[id].counterPublicKeys[i];
         }
+        require(verifySum(sumProofs, points), "check the sum of public key failed");
 
         voteInfos[id].state = STATE_VOTING;
         voteInfos[id].sumPublicKey = Point({
-            x: windowSums[windowSums.length-1].x,
-            y: windowSums[windowSums.length-1].y
+            x: sumProofs[sumProofs.length-1].sum.x,
+            y: sumProofs[sumProofs.length-1].sum.y
         });
         emit ChangeStateLog(id, STATE_VOTING);
     }
@@ -195,51 +181,80 @@ contract Avote is IVoter, ICounter, ISponsor, Initializable, OwnableUpgradeable 
         return ZERO_POINT;
     }
 
-    function ChangeStateToTallying(uint256 id, Proof[][2] calldata proofs, Point[][2] calldata windowSums) external {
+    function ChangeStateToTallying(uint256 id, SumProof[] calldata proofsC1, SumProof[] calldata proofsC2) external {
         require(voteInfos[id].state == STATE_VOTING, "state is not voting");
         require(voteInfos[id].voters.length == voteInfos[id].ballots.length || 
             voteInfos[id].expiredBlock <= block.number, "cannot change state yet");
-        require(proofs[0].length == windowSums[0].length, "the proofs' length is not equal as the windowSumsC1' length");
-        require(proofs[1].length == windowSums[1].length, "the proofs' length is not equal as the windowSumsC1' length");
-        require((voteInfos[id].ballots.length-1) / (WINDOW_SIZE-1) + 1 == proofs[0].length, "the length of proofs c1 is not match with the counters' number");
-        require((voteInfos[id].ballots.length-1) / (WINDOW_SIZE-1) + 1 == proofs[1].length, "the length of proofs c2 is not match with the counters' number");
+        require((voteInfos[id].ballots.length-1) / (WINDOW_SIZE-1) + 1 == proofsC1.length, "the length of proofs c1 is not match with the counters' number");
+        require((voteInfos[id].ballots.length-1) / (WINDOW_SIZE-1) + 1 == proofsC2.length, "the length of proofs c2 is not match with the counters' number");
 
-        for (uint256 t = 0; t < 2; t++) {
-            uint256 lastX = 0;
-            uint256 lastY = 1;
-            for (uint256 i = 0; i < proofs[t].length; i++) {
-                uint256[PUBLIC_SIGNAL_SIZE] memory publicSignal;
-                publicSignal[0] = lastX;
-                publicSignal[1] = lastY;
-                for (uint256 j = 0; j < WINDOW_SIZE - 1; j++) {
-                    if (i*(WINDOW_SIZE - 1)+j < voteInfos[id].ballots.length) {
-                        publicSignal[(j+1)*2] = ballotsPoint(id, i*(WINDOW_SIZE - 1)+j, t).x; // voteInfos[id].ballots[i*(WINDOW_SIZE - 1)+j].c1.x;
-                        publicSignal[(j+1)*2+1] = ballotsPoint(id, i*(WINDOW_SIZE - 1)+j, t).y; // voteInfos[id].ballots[i*(WINDOW_SIZE - 1)+j].c1.y;
-                    } else {
-                        publicSignal[(j+1)*2] = 0;
-                        publicSignal[(j+1)*2+1] = 1;
-                    }
-                }
-                publicSignal[WINDOW_SIZE*2] = windowSums[t][i].x;
-                publicSignal[WINDOW_SIZE*2+1] = windowSums[t][i].y;
-                bool isVerified = sumVerifier.verifyProof(proofs[t][i].a, proofs[t][i].b, proofs[t][i].c, publicSignal);
-                require(isVerified, "check the sum of public key failed");
-                lastX = windowSums[t][i].x;
-                lastY = windowSums[t][i].y;
-            }
+        Point[] memory c1Points = new Point[](voteInfos[id].ballots.length);
+        Point[] memory c2Points = new Point[](voteInfos[id].ballots.length);
+        for (uint256 i = 0; i < voteInfos[id].ballots.length; i++) {
+            c1Points[i] = voteInfos[id].ballots[i].c1;
+            c2Points[i] = voteInfos[id].ballots[i].c2;
         }
+        require(verifySum(proofsC1, c1Points), "check the sum of c1 failed");
+        require(verifySum(proofsC2, c2Points), "check the sum of c2 failed");
+
+        // for (uint256 t = 0; t < 2; t++) {
+        //     uint256 lastX = 0;
+        //     uint256 lastY = 1;
+        //     for (uint256 i = 0; i < proofs[t].length; i++) {
+        //         uint256[PUBLIC_SIGNAL_SIZE] memory publicSignal;
+        //         publicSignal[0] = lastX;
+        //         publicSignal[1] = lastY;
+        //         for (uint256 j = 0; j < WINDOW_SIZE - 1; j++) {
+        //             if (i*(WINDOW_SIZE - 1)+j < voteInfos[id].ballots.length) {
+        //                 publicSignal[(j+1)*2] = ballotsPoint(id, i*(WINDOW_SIZE - 1)+j, t).x; // voteInfos[id].ballots[i*(WINDOW_SIZE - 1)+j].c1.x;
+        //                 publicSignal[(j+1)*2+1] = ballotsPoint(id, i*(WINDOW_SIZE - 1)+j, t).y; // voteInfos[id].ballots[i*(WINDOW_SIZE - 1)+j].c1.y;
+        //             } else {
+        //                 publicSignal[(j+1)*2] = 0;
+        //                 publicSignal[(j+1)*2+1] = 1;
+        //             }
+        //         }
+        //         publicSignal[WINDOW_SIZE*2] = windowSums[t][i].x;
+        //         publicSignal[WINDOW_SIZE*2+1] = windowSums[t][i].y;
+        //         bool isVerified = sumVerifier.verifyProof(proofs[t][i].a, proofs[t][i].b, proofs[t][i].c, publicSignal);
+        //         require(isVerified, "check the sum of public key failed");
+        //         lastX = windowSums[t][i].x;
+        //         lastY = windowSums[t][i].y;
+        //     }
+        // }
         voteInfos[id].state = STATE_TALLYING;
         voteInfos[id].sumVotes = Cipher({
             c1: Point({
-                x: windowSums[0][windowSums[0].length-1].x,
-                y: windowSums[0][windowSums[0].length-1].y
+                x: proofsC1[proofsC1.length-1].sum.x,
+                y: proofsC1[proofsC1.length-1].sum.y
             }),
             c2: Point({
-                x: windowSums[1][windowSums[1].length-1].x,
-                y: windowSums[1][windowSums[1].length-1].y
+                x: proofsC2[proofsC2.length-1].sum.x,
+                y: proofsC2[proofsC2.length-1].sum.y
             })
         });
         emit ChangeStateLog(id, STATE_TALLYING);
+    }
+
+    function ChangeStateToPublished(uint256 id, SumProof[] memory proofs) external {
+        require(voteInfos[id].state == STATE_TALLYING, "state is not tallying");
+        require(validCounters.length == voteInfos[id].counterPublicKeys.length || 
+            voteInfos[id].expiredBlock <= block.number, "cannot change state yet");
+        require((voteInfos[id].decryptPoints.length-1) / (WINDOW_SIZE-1) + 1 == proofs.length, "the length of proofs is not match with the decryptPoints' number");
+
+        Point[] memory points = new Point[](voteInfos[id].decryptPoints.length + 1);
+        points[0] = voteInfos[id].sumVotes.c2;
+        for (uint256 i = 0; i < voteInfos[id].decryptPoints.length; i++) {
+            points[i+1] = Point({
+                x: 21888242871839275222246405745257275088548364400416034343698204186575808495617-voteInfos[id].decryptPoints[i].x,
+                y: voteInfos[id].decryptPoints[i].y
+            });
+        }
+        require(verifySum(proofs, points), "check the sum failed");
+
+        voteInfos[id].state = STATE_PUBLISHED;
+        voteInfos[id].decryptResultPoint = proofs[proofs.length-1].sum;
+
+        emit ChangeStateLog(id, STATE_PUBLISHED);
     }
 
     function hasVotingRight(uint256 id, address sender) view internal returns (bool) {
@@ -249,6 +264,34 @@ contract Avote is IVoter, ICounter, ISponsor, Initializable, OwnableUpgradeable 
             }
         }
         return false;
+    }
+
+    function verifySum(SumProof[] memory sumProofs, Point[] memory points) view internal returns (bool) {
+        uint256 lastX = 0;
+        uint256 lastY = 1;
+        for (uint256 i = 0; i < sumProofs.length; i++) {
+            uint256[PUBLIC_SIGNAL_SIZE] memory publicSignal;
+            publicSignal[0] = lastX;
+            publicSignal[1] = lastY;
+            for (uint256 j = 0; j < WINDOW_SIZE - 1; j++) {
+                if (i*(WINDOW_SIZE - 1)+j < points.length) {
+                    publicSignal[(j+1)*2] = points[i*(WINDOW_SIZE - 1)+j].x;
+                    publicSignal[(j+1)*2+1] = points[i*(WINDOW_SIZE - 1)+j].y;
+                } else {
+                    publicSignal[(j+1)*2] = 0;
+                    publicSignal[(j+1)*2+1] = 1;
+                }
+            }
+            publicSignal[WINDOW_SIZE*2] = sumProofs[i].sum.x;
+            publicSignal[WINDOW_SIZE*2+1] = sumProofs[i].sum.y;
+            bool isVerified = sumVerifier.verifyProof(sumProofs[i].proof.a, sumProofs[i].proof.b, sumProofs[i].proof.c, publicSignal);
+            if (!isVerified) {
+                return false;
+            }
+            lastX = sumProofs[i].sum.x;
+            lastY = sumProofs[i].sum.y;
+        }
+        return true;
     }
 
     function GetVoteInfo(uint256 id) view public returns(VoteInfo memory) {

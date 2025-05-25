@@ -47,13 +47,14 @@ describe("Verifier", function () {
     await fixture.avote.write.SetTestState([fixture.voteId, fixtureTest.InitiatedStateEnd()]);
 
     let proofs = await Prover.GenerateCheckSumProof(fixture.curve, fixtureTest.InitiatedStateEnd().counterPublicKeys)
-    let p: Proof[] = [];
-    let w: BigPoint[] = [];
+    let p: Util.SumProof[] = [];
     for (let i = 0; i < proofs.length; i++) {
-      p.push(proofs[i].proof);
-      w.push(proofs[i].sum);
+      p.push({
+        proof: proofs[i].proof,
+        sum: proofs[i].sum,
+      });
     }
-    let rsp = await fixture.avote.write.ChangeStateToVoting([fixture.voteId, p, w]);    
+    let rsp = await fixture.avote.write.ChangeStateToVoting([fixture.voteId, p]);    
     await fixture.publicClient.waitForTransactionReceipt({hash: rsp});
     const event = await fixture.avote.getEvents.ChangeStateLog();
     expect(event).to.have.lengthOf(1);
@@ -65,25 +66,66 @@ describe("Verifier", function () {
     await fixture.avote.write.SetTestState([fixture.voteId, fixtureTest.VotingStateEnd()]);
 
     let ballots = fixtureTest.VotingStateEnd().ballots;
-    let points: BigPoint[][] = [[], []];
+    let pointsC1: BigPoint[] = [];
+    let pointsC2: BigPoint[] = [];
     for (let i = 0; i < ballots.length; i++) {
-      points[0].push(ballots[i].c1);
-      points[1].push(ballots[i].c2);
+      pointsC1.push(ballots[i].c1);
+      pointsC2.push(ballots[i].c2);
     }
-    let ps: [Util.Proof[], Util.Proof[]] = [[], []];
-    let ws: [Util.BigPoint[], Util.BigPoint[]] = [[], []];
-    for (let i = 0; i < 2; i++) {
-      let proof = await Prover.GenerateCheckSumProof(fixture.curve, points[i])
-      for (let j = 0; j < proof.length; j++) {
-        ps[i].push(proof[j].proof);
-        ws[i].push(proof[j].sum);
-      }
+
+    let proofsC1: Util.SumProof[] = [];
+    let proofsC2: Util.SumProof[] = [];
+
+    let proof1 = await Prover.GenerateCheckSumProof(fixture.curve, pointsC1);
+    for (let j = 0; j < proof1.length; j++) {
+      proofsC1.push({
+        proof: proof1[j].proof,
+        sum: proof1[j].sum,
+      });
     }
-    let rsp = await fixture.avote.write.ChangeStateToTallying([fixture.voteId, ps, ws]);    
+
+    let proof2 = await Prover.GenerateCheckSumProof(fixture.curve, pointsC2);
+    for (let j = 0; j < proof2.length; j++) {
+      proofsC2.push({
+        proof: proof2[j].proof,
+        sum: proof2[j].sum,
+      });
+    }
+
+
+    let rsp = await fixture.avote.write.ChangeStateToTallying([fixture.voteId, proofsC1, proofsC2]);    
     await fixture.publicClient.waitForTransactionReceipt({hash: rsp});
     const event = await fixture.avote.getEvents.ChangeStateLog();
     expect(event).to.have.lengthOf(1);
     expect(await fixture.avote.read.GetVoteInfo([fixture.voteId])).to.be.deep.equals(fixtureTest.TallyingStateStart());
+  })
+
+  it("Should change the state to published successfully", async function () {
+    const fixture = await loadFixture(fixtureTest.deployFixture);
+    let state = fixtureTest.TallyingStateEnd();
+    await fixture.avote.write.SetTestState([fixture.voteId, state]);
+
+    let points: BigPoint[] = [state.sumVotes.c2];
+    for (let i = 0; i < state.decryptPoints.length; i++) {
+      points.push({
+        x: -state.decryptPoints[i].x,
+        y: state.decryptPoints[i].y,
+      })
+    }
+
+    let proofs = await Prover.GenerateCheckSumProof(fixture.curve, points);
+    let p: Util.SumProof[] = [];
+    for (let i = 0; i < proofs.length; i++) {
+      p.push({
+        proof: proofs[i].proof,
+        sum: proofs[i].sum,
+      });
+    }
+    let rsp = await fixture.avote.write.ChangeStateToPublished([fixture.voteId, p]);    
+    await fixture.publicClient.waitForTransactionReceipt({hash: rsp});
+    const event = await fixture.avote.getEvents.ChangeStateLog();
+    expect(event).to.have.lengthOf(1);
+    expect(await fixture.avote.read.GetVoteInfo([fixture.voteId])).to.be.deep.equals(fixtureTest.PublishedState());
   })
 
   it("Should submit the right votes", async () => {

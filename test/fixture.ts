@@ -27,6 +27,7 @@ interface TestState {
     expiredBlock: bigint;
     sumPublicKey: BigPoint;
     sumVotes: BigCipher;
+    decryptResultPoint: BigPoint;
 }
 
 var testCandidates: readonly `0x${string}`[] = [
@@ -151,6 +152,7 @@ export function InitiatedStateStart(): TestState {
       expiredBlock: 11n,
       sumPublicKey: zeroPoint,
       sumVotes: {c1: zeroPoint, c2: zeroPoint},
+      decryptResultPoint: zeroPoint,
   };
 }
 
@@ -166,6 +168,7 @@ export function InitiatedStateEnd(): TestState {
       expiredBlock: 11n,
       sumPublicKey: zeroPoint,
       sumVotes: {c1: zeroPoint, c2: zeroPoint},
+      decryptResultPoint: zeroPoint,
   };
 }
 
@@ -181,6 +184,7 @@ export function VotingStateStart(): TestState {
       expiredBlock: 11n,
       sumPublicKey: testSumPublicKeys,
       sumVotes: {c1: zeroPoint, c2: zeroPoint},
+      decryptResultPoint: zeroPoint,
   };
 }
 
@@ -196,6 +200,7 @@ export function VotingStateEnd(): TestState {
       expiredBlock: 11n,
       sumPublicKey: testSumPublicKeys,
       sumVotes: {c1: zeroPoint, c2: zeroPoint},
+      decryptResultPoint: zeroPoint,
   };
 }
 
@@ -211,6 +216,7 @@ export function TallyingStateStart(): TestState {
       expiredBlock: 11n,
       sumPublicKey: testSumPublicKeys,
       sumVotes: testSumBallots,
+      decryptResultPoint: zeroPoint,
   };
 }
 
@@ -226,6 +232,26 @@ export function TallyingStateEnd(): TestState {
       expiredBlock: 11n,
       sumPublicKey: testSumPublicKeys,
       sumVotes: testSumBallots,
+      decryptResultPoint: zeroPoint,
+  };
+}
+
+export function PublishedState(): TestState {
+  return {
+      candidates: testCandidates,
+      voters: testVoters,
+      sponporEthers: 1n,
+      state: 3,
+      counterPublicKeys: testCounterPublicKeys,
+      ballots: testBallots,
+      decryptPoints: testDecryptPoints,
+      expiredBlock: 11n,
+      sumPublicKey: testSumPublicKeys,
+      sumVotes: testSumBallots,
+      decryptResultPoint: {
+        x: 7582035475627193640797276505418002166691739036475590846121162698650004832581n,
+        y: 7801528930831391612913542953849263092120765287178679640990215688947513841260n
+      },
   };
 }
 
