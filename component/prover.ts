@@ -1,6 +1,6 @@
-import { buildBabyjub, Point } from "circomlibjs";
+import { BabyJub, buildBabyjub, Point } from "circomlibjs";
 import * as snarkjs from "snarkjs";
-import { BigPoint } from "./util";
+import * as Util from "./util";
 
 interface BaseCreateSignalParam {
 
@@ -23,9 +23,9 @@ interface CreateDecryptSignalsParam {
 }
 
 interface CreateCheckSumParam {
-    lastSum: BigPoint;
-    points: BigPoint[];
-    outSum: BigPoint;
+    lastSum: Util.BigPoint;
+    points: Util.BigPoint[];
+    outSum: Util.BigPoint;
 }
 
 export abstract class Prover<PublicSignalLength extends number = number> {
@@ -133,14 +133,6 @@ export class CheckSum extends Prover<66> {
             points: points,
             sum: [params.outSum.x, params.outSum.y],
         }
-        // const dMulC1: Point = curve.mulPointEscalar(params.c1, params.privateKey);
-        // return {
-        //     // d:   params.privateKey.toString(2).padStart(256,'0').split('').map(Number),
-        //     privateKey: params.privateKey,
-        //     publicKey: [ curve.F.toString(params.publicKey[0]), curve.F.toString(params.publicKey[1]) ],
-        //     c1: [curve.F.toString(params.c1[0]),  curve.F.toString(params.c1[1])],
-        //     dMulC1: [ curve.F.toString(dMulC1[0]), curve.F.toString(dMulC1[1]) ],
-        // };
     }
 }
 
@@ -164,4 +156,50 @@ function createSubmitParams<PublicSignalLength extends number>(proof: snarkjs.Gr
         ],
         [proof.pi_c[0], proof.pi_c[1]],
         publicSignals as any];
+}
+
+export async function GenerateCheckSumProof(curve: BabyJub, points: readonly Util.BigPoint[]): Promise<Util.SumProof[]> {
+    let proofs: Util.SumProof[] = [];
+    let lastSum: Util.BigPoint = {x: 0n, y: 1n};
+    let sumPoint = Util.toPoint(curve, lastSum);
+    const windowSize = 32;
+    for (let i = 0; i < Math.floor((points.length - 1) / (windowSize-1)) + 1; i++) {
+        let windowPoints: Util.BigPoint[] = [];
+        for (let j = 0; j < (windowSize-1); j++) {
+            if (i*(windowSize-1)+j >= points.length) {
+                windowPoints.push({
+                    x: 0n,
+                    y: 1n,
+                });
+            } else {
+                windowPoints.push({
+                    x: points[i*(windowSize-1) + j].x,
+                    y: points[i*(windowSize-1) + j].y
+                });
+            }
+            sumPoint = curve.addPoint(sumPoint, Util.toPoint(curve, windowPoints[j]));
+        }
+
+        let outSum: Util.BigPoint = Util.toBigPoint(curve, sumPoint);
+        let prover = new CheckSum();
+        const proof = await prover.prove({
+            lastSum: lastSum,
+            points: windowPoints,
+            outSum: outSum,
+        });
+
+        proofs.push({
+            proof: {
+                a: proof[0],
+                b: proof[1],
+                c: proof[2],
+            },
+            sum: {
+                x: outSum.x,
+                y: outSum.y,
+            }
+        })
+        lastSum = Util.toBigPoint(curve, sumPoint);
+    }
+    return proofs;
 }

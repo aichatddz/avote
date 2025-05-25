@@ -1,6 +1,5 @@
-import {Point, buildBabyjub, BabyJub} from "circomlibjs"
+import {Point, BabyJub} from "circomlibjs"
 import {ethers} from "ethers"
-import { bigint } from "hardhat/internal/core/params/argumentTypes";
 
 export interface BigPoint {
     x: bigint;
@@ -11,6 +10,11 @@ export interface Proof {
     a: [bigint, bigint];
     b: [[bigint, bigint], [bigint, bigint]];
     c: [bigint, bigint];
+}
+
+export interface SumProof {
+    proof: Proof;
+    sum: BigPoint;
 }
 
 export function toBigPoint(curve: BabyJub, p: Point): BigPoint {
@@ -30,6 +34,11 @@ export function toPoint(curve: BabyJub, b: BigPoint): Point {
 export interface Cipher {
     c1: Point;
     c2: Point;
+}
+
+export interface BigCipher {
+    c1: BigPoint;
+    c2: BigPoint;
 }
 
 export function sumPoints(curve: BabyJub, points: Point[]): Point {

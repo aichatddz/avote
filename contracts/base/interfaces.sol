@@ -15,7 +15,7 @@ struct Cipher {
 }
 
 interface ISponsor {
-    function Initiate(address[] calldata candidates, uint256 id, uint256 initiateBlockNumbers) external payable;
+    function Initiate(address[] calldata candidates, address[] calldata voters, uint256 id, uint256 initiateBlockNumbers) external payable;
 }
 
 interface IVoter {
