@@ -1,19 +1,19 @@
-import { sumPoints, BigPoint, BigCipher, Cipher, sumBigPoints, decode, toBigPoint, randomScalar} from "../component/util";
+import * as Util from "../component/util";
 import hre from "hardhat";
-import { buildBabyjub, Point, BabyJub } from "circomlibjs";
+import * as CircomLib from "circomlibjs";
 
 interface VoterTestValue {
   private: bigint;  // it's not used yet
   value: number;
   randomK: bigint;
-  c1: BigPoint;
-  c2: BigPoint;
+  c1: Util.BigPoint;
+  c2: Util.BigPoint;
 }
 
 interface CounterTestValue {
   private: bigint;
   // public: BigPoint;
-  dMulC1: BigPoint;
+  dMulC1: Util.BigPoint;
 }
 
 interface TestState {
@@ -21,13 +21,13 @@ interface TestState {
     voters: readonly `0x${string}`[];
     sponporEthers: bigint;
     state: number;
-    counterPublicKeys: readonly BigPoint[];
-    ballots: readonly BigCipher[];
-    decryptPoints: readonly BigPoint[];
+    counterPublicKeys: readonly Util.BigPoint[];
+    ballots: readonly Util.BigCipher[];
+    decryptPoints: readonly Util.BigPoint[];
     expiredBlock: bigint;
-    sumPublicKey: BigPoint;
-    sumVotes: BigCipher;
-    decryptResultPoint: BigPoint;
+    sumPublicKey: Util.BigPoint;
+    sumVotes: Util.BigCipher;
+    decryptResultPoint: Util.BigPoint;
 }
 
 var testCandidates: readonly `0x${string}`[] = [
@@ -46,7 +46,7 @@ var testVoters: readonly `0x${string}`[] = [
   "0xdF3e18d64BC6A983f673Ab319CCaE4f1a57C7097"
 ]
 
-var testCounterPublicKeys: readonly BigPoint[] = [{
+var testCounterPublicKeys: readonly Util.BigPoint[] = [{
       x: 12850997157950850405723489739354319047062600787099111201744321248306482255143n,
       y: 14743751048901513658331640233977231163182936175196280839934763098776720590409n
   },{
@@ -57,12 +57,12 @@ var testCounterPublicKeys: readonly BigPoint[] = [{
       y: 10060294436525543204611718053921107805932965241803516374071343926591655898063n
 }]
 
-var testSumPublicKeys: BigPoint = {
+var testSumPublicKeys: Util.BigPoint = {
   x: 17562281052541849814619194517171420429774894242466780171322661757215271005933n,
   y: 5545643084915208416594058274347129551972220545965249783234145634433536213542n,
 }
 
-var testBallots: BigCipher[] = [
+var testBallots: Util.BigCipher[] = [
   {
       c1: {
         x: 4927186078240140046265353961886559884626197109666961159300140392289670006231n,
@@ -115,7 +115,7 @@ var testBallots: BigCipher[] = [
   }
 ]
 
-var testSumBallots: BigCipher = {
+var testSumBallots: Util.BigCipher = {
   c1: {
     x: 4581260430175070783408571085641532620249784736829700533832715250107242346585n,
     y: 14882391343821010434428845766509207672190941494785204334611706690448955976844n,
@@ -126,7 +126,7 @@ var testSumBallots: BigCipher = {
   }
 }
 
-var testDecryptPoints: BigPoint[] = [{
+var testDecryptPoints: Util.BigPoint[] = [{
     x: 17586405391974699223143074723589877012749432494028331276422099265030666348654n,
     y: 16437489348796400388617656096621684919302650347297451868090043575543022655568n,
   },{
@@ -138,7 +138,7 @@ var testDecryptPoints: BigPoint[] = [{
   },
 ]
 
-const zeroPoint: BigPoint = {x: 0n, y: 1n};
+const zeroPoint: Util.BigPoint = {x: 0n, y: 1n};
 
 export function InitiatedStateStart(): TestState {
   return {
@@ -256,7 +256,6 @@ export function PublishedState(): TestState {
 }
 
 export async function deployFixture() {
-    // Contracts are deployed using the first signer/account by default
     const accounts = await hre.viem.getWalletClients();
  
     const voteVerifier = await hre.viem.deployContract("contracts/circuit/vote_verifier.sol:Groth16Verifier", [], {});
@@ -265,7 +264,7 @@ export async function deployFixture() {
     const avote = await hre.viem.deployContract("AvoteForTest", [voteVerifier.address, publicKeyVerifier.address, decryptVerifier.address], {});
 
     const publicClient = await hre.viem.getPublicClient();
-    const curve = await buildBabyjub();
+    const curve = await CircomLib.buildBabyjub();
 
     for (let i = 1; i <= 3; i++) {
       await avote.write.AddCounter([accounts[i].account.address]);
@@ -362,24 +361,8 @@ export async function deployFixture() {
         }
       }
     ]
-    const expectPublicKey: Point = [
-      curve.F.e(17562281052541849814619194517171420429774894242466780171322661757215271005933n.toString()),
-      curve.F.e(5545643084915208416594058274347129551972220545965249783234145634433536213542n.toString()),
-    ];
+    const voteId = Util.randomScalar(curve);
 
-    const sumCipher: Cipher = {
-      c1: [curve.F.e(4581260430175070783408571085641532620249784736829700533832715250107242346585n.toString()), curve.F.e(14882391343821010434428845766509207672190941494785204334611706690448955976844n.toString())],
-      c2: [curve.F.e(8331369744015922138462484517269120738268013900871287974180609798583516246958n.toString()), curve.F.e(10188787274520102679995611343114671845066683377365217292362416829258517313708n.toString())],
-    }
-
-    const sumDecrypts: BigPoint = {
-      x: 1617871771995441095161541924150672646449831557532794326082971468472488563059n,
-      y: 2084097603320654059057452933899276738950979811550339513244161863208586951653n,
-    }
-
-    const voteId = randomScalar(curve);
-    // console.log(voteId);
-
-    return { curve, avote, counterTestValues, voterPrivates, expectPublicKey, sumCipher, sumDecrypts, voteId, accounts, publicClient };
+    return { curve, avote, counterTestValues, voterPrivates, voteId, accounts, publicClient };
   }
 

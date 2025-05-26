@@ -7,7 +7,7 @@ interface BaseCreateSignalParam {
 }
 
 interface CreateVoteSignalsParam {
-    publicKey: Point;
+    publicKey: Util.BigPoint;
     value: number;
     randomK: bigint;
 }
@@ -76,10 +76,10 @@ export class Voter extends Prover<6> {
         const m: Point = curve.mulPointEscalar(curve.Base8, params.value);  // the mapped point in the curve of value value
         const k: bigint = this.randomK; // random big number
         const c1: Point = curve.mulPointEscalar(curve.Base8, k);
-        const c2: Point = curve.addPoint(m, curve.mulPointEscalar(params.publicKey, k));
+        const c2: Point = curve.addPoint(m, curve.mulPointEscalar(Util.toPoint(curve, params.publicKey), k));
         return {
             randomK: k,
-            publicKey: [ curve.F.toString(params.publicKey[0]), curve.F.toString(params.publicKey[1]) ],
+            publicKey: [ curve.F.toString(Util.toPoint(curve, params.publicKey)[0]), curve.F.toString(Util.toPoint(curve, params.publicKey)[1]) ],
             c1: [ curve.F.toString(c1[0]), curve.F.toString(c1[1]) ],
             c2: [curve.F.toString(c2[0]), curve.F.toString(c2[1]) ],
             m: [ curve.F.toString(m[0]), curve.F.toString(m[1]) ],
