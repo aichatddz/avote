@@ -26,10 +26,21 @@ We chose EC-Elgamal because it's more efficient due to its smaller key size. Mor
 
 ### How EC-Elgamal works?
 In circom, EC-Elgamal is base on baby jubjub curve(one kind of ellipse curves) due to it's zero-knownledge-friendly. It's asymmetric encryption. Each counter $T_i$ generates a private key $d_{T_i}$, and publishes his public key $Q_{T_i} = d_{T_i}G$ on the contract, while G is base point on the curve.
-Suppose there are n counters submit there public key $Q$ and the machine state changed to voting. Each voter $V_i$ then use $Q = \Sigma_{i=1}^{n}Q_{T_i}$ as the public key to encrypt their ballots and then publish their ciphertext on the contract. The ciphertext is consists of two points, $(C_{V_i1}, C_{V_i2})$, where $$C_{V_i1} = kG$$ $$C_{V_i2} = M + kQ$$ where $k$ is a random big number than less than the suborder of the curve.
+Suppose there are $N_T$ counters submit their public key $Q_i$ and the machine state changed to voting. Each voter $V_i$ then use $Q = \Sigma_{i=1}^{n}Q_{T_i}$ as the public key to encrypt their ballots and then publish their ciphertext on the contract. The ciphertext is consists of two points, $(C_{V_i1}, C_{V_i2})$, where 
+
+$$
+\begin{cases}
+C_{V_i1} = k_{V_i}G \\
+C_{V_i2} = M_{V_i} + k_{V_i}Q
+\end{cases}
+$$
+
+where $k$ is a random big number than less than the suborder of the curve.
 
 # References
 
 [Exploring Elliptic Curve Pairings](https://medium.com/@VitalikButerin/exploring-elliptic-curve-pairings-c73c1864e627) --Vitalik Buterin
 
 [An approximate introduction to how zk-SNARKs are possible](https://vitalik.eth.limo/general/2021/01/26/snarks.html) --Vitalik Buterin
+
+[Stars and bars (combinatorics)](https://en.wikipedia.org/wiki/Stars_and_bars_(combinatorics)) --wikipedia.org
