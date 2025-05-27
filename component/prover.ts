@@ -1,6 +1,7 @@
 import { BabyJub, buildBabyjub, Point } from "circomlibjs";
 import * as snarkjs from "snarkjs";
 import * as Util from "./util";
+import { bigint } from "hardhat/internal/core/params/argumentTypes";
 
 interface BaseCreateSignalParam {
 
@@ -8,8 +9,10 @@ interface BaseCreateSignalParam {
 
 interface CreateVoteSignalsParam {
     publicKey: Util.BigPoint;
-    value: number;
+    value: bigint;       // 1 <= v <= candidateNum
     randomK: bigint;
+    voterNum: bigint;
+    candidateNum: bigint;
 }
 
 interface CreatePublicKeySignalsParam {
@@ -71,9 +74,15 @@ export class Voter extends Prover<6> {
         super("./circom/compile/vote_js/vote.wasm", "./circom/vote_0001.zkey", 6);
         this.randomK = randomK;
     }
+    private mapBallotToValue(v: bigint, voterNum: bigint, candidateNum: bigint): bigint {
+        return (voterNum+1n) ** (candidateNum - v);
+    }
+    
     async createSignals(params: CreateVoteSignalsParam): Promise<snarkjs.CircuitSignals> {
         const curve = await buildBabyjub();
-        const m: Point = curve.mulPointEscalar(curve.Base8, params.value);  // the mapped point in the curve of value value
+        // m is the mapped point in the curve of value value
+        const m: Point = curve.mulPointEscalar(curve.Base8,
+            this.mapBallotToValue(params.value, params.voterNum, params.candidateNum));
         const k: bigint = this.randomK; // random big number
         const c1: Point = curve.mulPointEscalar(curve.Base8, k);
         const c2: Point = curve.addPoint(m, curve.mulPointEscalar(Util.toPoint(curve, params.publicKey), k));
