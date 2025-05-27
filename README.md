@@ -26,7 +26,7 @@ We chose EC-Elgamal because it's more efficient due to its smaller key size. Mor
 
 ### How EC-Elgamal works?
 In circom, EC-Elgamal is base on baby jubjub curve(one kind of ellipse curves) due to it's zero-knownledge-friendly. It's asymmetric encryption. Each counter $T_i$ generates a private key $d_{T_i}$, and publishes his public key $Q_{T_i} = d_{T_i}G$ on the contract, while G is base point on the curve.
-Suppose there are $N_T$ counters submit their public key $Q_i$ and the machine state changed to voting. Each voter $V_i$ then use $Q = \Sigma_{i=1}^{n}Q_{T_i}$ as the public key to encrypt their ballots and then publish their ciphertext on the contract. The ciphertext is consists of two points, $(C_{V_i1}, C_{V_i2})$, where 
+Suppose there are $N_T$ counters submit their public key $Q_i$ and the machine state changed to voting. Each voter $V_i$ then use $Q = \Sigma_{i=1}^{N_T}Q_{T_i}$ as the public key to encrypt their ballots and then publish their ciphertext on the contract. The ciphertext is consists of two points, $(C_{V_i1}, C_{V_i2})$, where 
 
 $$
 \begin{cases}
