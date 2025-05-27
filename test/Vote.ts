@@ -7,6 +7,7 @@ import hre from "hardhat";
 import * as Util from "../component/util"
 import * as Prover from "../component/prover"
 import * as fixtureTest from "./fixture"
+import * as Library from "../library"
 
 describe("Verifier", function () {
   it("Should initiate a vote successfully", async function () {
@@ -78,12 +79,15 @@ describe("Verifier", function () {
 
   it("Should submit the right votes", async () => {
     const fixture = await loadFixture(fixtureTest.deployFixture);
-    await fixture.avote.write.SetTestState([fixture.voteId, fixtureTest.VotingStateStart()]);
+    const state = fixtureTest.VotingStateStart();
+    await fixture.avote.write.SetTestState([fixture.voteId, state]);
     for (let i = 0; i < fixture.voterPrivates.length; i++) {
       let prover = new Prover.Voter(fixture.voterPrivates[i].randomK);
       const proof = await prover.prove({
         publicKey: fixtureTest.VotingStateStart().sumPublicKey,
         value: fixture.voterPrivates[i].value,
+        voterNum: BigInt(state.voters.length),
+        candidateNum: BigInt(state.candidates.length),
       });
       let wallet = fixture.accounts[i+10];
       let cli = await hre.viem.getContractAt("Avote", fixture.avote.address, {
@@ -158,7 +162,6 @@ describe("Verifier", function () {
     const fixture = await loadFixture(fixtureTest.deployFixture);
     let state = fixtureTest.TallyingStateEnd();
     await fixture.avote.write.SetTestState([fixture.voteId, state]);
-
     let points: Util.BigPoint[] = [state.sumVotes.c2];
     for (let i = 0; i < state.decryptPoints.length; i++) {
       points.push({
