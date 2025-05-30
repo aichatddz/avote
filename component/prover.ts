@@ -1,7 +1,6 @@
 import { BabyJub, buildBabyjub, Point } from "circomlibjs";
 import * as snarkjs from "snarkjs";
 import * as Util from "./util";
-import { bigint } from "hardhat/internal/core/params/argumentTypes";
 
 interface BaseCreateSignalParam {
 
@@ -17,6 +16,10 @@ interface CreateVoteSignalsParam {
 
 interface CreatePublicKeySignalsParam {
     privateKey: bigint;
+}
+
+interface CreateScalarMulGSignalsParam {
+    scalar: bigint;
 }
 
 interface CreateDecryptSignalsParam {
@@ -68,6 +71,21 @@ export abstract class Prover<PublicSignalLength extends number = number> {
     }
 }
 
+export class PublicKey extends Prover<2> {
+    public constructor() {
+        super("./circom/compile/public_key_js/public_key.wasm", "./circom/public_key_0001.zkey", 2);
+    }
+    async createSignals(params: CreatePublicKeySignalsParam): Promise<snarkjs.CircuitSignals> {
+        const curve = await buildBabyjub();
+        const publicKey: Point = curve.mulPointEscalar(curve.Base8, params.privateKey);
+        return {
+            privateKey: params.privateKey,
+            publicKey:  [curve.F.toString(publicKey[0]), curve.F.toString(publicKey[1])],
+        };
+    }
+}
+
+
 export class Voter extends Prover<6> {
     private randomK: bigint;
     public constructor(randomK: bigint) {
@@ -75,6 +93,7 @@ export class Voter extends Prover<6> {
         this.randomK = randomK;
     }
     private mapBallotToValue(v: bigint, voterNum: bigint, candidateNum: bigint): bigint {
+        // console.log("(voterNum+1n) ** (candidateNum - v): ", (voterNum+1n) ** (candidateNum - v))
         return (voterNum+1n) ** (candidateNum - v);
     }
     
@@ -96,17 +115,16 @@ export class Voter extends Prover<6> {
     }
 }
 
-export class SubmitPublicKey extends Prover<2> {
+export class ScalarMulG extends Prover<3> {
     public constructor() {
-        super("./circom/compile/publickey_js/publickey.wasm", "./circom/publickey_0001.zkey", 2);
+        super("./circom/compile/scalar_mul_g_js/scalar_mul_g.wasm", "./circom/scalar_mul_g_0001.zkey", 3);
     }
-    async createSignals(params: CreatePublicKeySignalsParam): Promise<snarkjs.CircuitSignals> {
+    async createSignals(params: CreateScalarMulGSignalsParam): Promise<snarkjs.CircuitSignals> {
         const curve = await buildBabyjub();
-        const publicKey: Point = curve.mulPointEscalar(curve.Base8, params.privateKey);
+        const publicKey: Point = curve.mulPointEscalar(curve.Base8, params.scalar);
         return {
-            // d:   params.privateKey.toString(2).padStart(256,'0').split('').map(Number),
-            privateKey: params.privateKey,
-            publicKey:  [curve.F.toString(publicKey[0]), curve.F.toString(publicKey[1])],
+            scalar: params.scalar,
+            point:  [curve.F.toString(publicKey[0]), curve.F.toString(publicKey[1])],
         };
     }
 }

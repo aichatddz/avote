@@ -7,7 +7,7 @@ import hre from "hardhat";
 import * as Util from "../component/util"
 import * as Prover from "../component/prover"
 import * as fixtureTest from "./fixture"
-import * as Library from "../library"
+import { bigint } from "hardhat/internal/core/params/argumentTypes";
 
 describe("Verifier", function () {
   it("Should initiate a vote successfully", async function () {
@@ -41,7 +41,7 @@ describe("Verifier", function () {
     const fixture = await loadFixture(fixtureTest.deployFixture);
     await fixture.avote.write.SetTestState([fixture.voteId, fixtureTest.InitiatedStateStart()]);
 
-    let prover = new Prover.SubmitPublicKey();
+    let prover = new Prover.PublicKey();
     for (let i = 0; i < fixture.counterTestValues.length; i++) {
       const proof = await prover.prove({
         privateKey: fixture.counterTestValues[i].private,
@@ -178,7 +178,31 @@ describe("Verifier", function () {
         sum: proofs[i].sum,
       });
     }
-    let rsp = await fixture.avote.write.ChangeStateToPublished([fixture.voteId, p]);    
+
+    // console.log("proofs: ", proofs)
+
+    // let scalar = 6**4*3 + 6**3 + 6**2;
+    // console.log(scalar, Util.toBigPoint(fixture.curve,  fixture.curve.mulPointEscalar(fixture.curve.Base8, scalar)) );
+    let result = Util.DecodePointToScalar(fixture.curve,
+       Util.toPoint(fixture.curve, proofs[proofs.length-1].sum),
+       BigInt(state.voters.length),
+       BigInt(state.candidates.length),
+    )
+    let scalar = 0n;
+    for (let i = 0; i < result.length; i++) {
+      scalar += BigInt(state.voters.length+1)**BigInt(result.length-1-i)*result[i];
+    }
+    let proof = await (new Prover.ScalarMulG()).prove({scalar: BigInt(scalar)});
+    let s: Util.PublishProof = {
+      proof: {
+          a: proof[0],
+          b: proof[1],
+          c: proof[2],
+      },
+      tally: result,
+    }
+    // console.log(proof[3])
+    let rsp = await fixture.avote.write.ChangeStateToPublished([fixture.voteId, p, s]);    
     await fixture.publicClient.waitForTransactionReceipt({hash: rsp});
     const event = await fixture.avote.getEvents.ChangeStateLog();
     expect(event).to.have.lengthOf(1);
