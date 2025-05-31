@@ -65,13 +65,17 @@ C_{V2}-\sum_{j=1}^{N_T}{\omega_{T_j}} & =\sum_{i=1}^{N_V}C_{V_i2}-\sum_{j=1}^{N_
 $$
 
 ### How to map the ballot to the curve?
+We need to design a function F that satisfies three conditions:
+1. F is bijective. That means there exist one and only one point M that satisfies $M=F(m)$, and at the same time, there exists an inverse function $F^{-1}$ mapping $M$ to the unique value $m=F^{-1}(M)$
+2. We can calculte $M=F(m)$ and $m=F^{-1}(M)$ in acceptable time complexity.
+3. F should preserve the homomorphic additional property, that means $F(m_1)+F(m_2)=F(m_1+m_2)$
 
 ### Zero-knowledge proof
 Zero-knowledge proof(ZKP) is a cryptograph method that allows one party(prover) to convince another party(verifier) that a statement is true without revealing any additional information beyond the validity of the statement itself. The key properties of ZKP is:
 
 **completeness** - If the statement is true, the verifier will be convinced by an honest prover;
 
-**soundness** - If the statement is false, no dishonest prover can convinced the verifier (except with negligible probability);
+**soundness** - If the statement is false, no dishonest prover can convince the verifier (except with negligible probability);
 
 **zero-knowledge** - The verifier learns nothing beyond the fact that the statement is true.
 
