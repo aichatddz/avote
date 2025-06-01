@@ -72,30 +72,41 @@ We need to design a function F that satisfies three conditions:
 
 Koblitz encoding is popular used since it is bijective and easy to calculate $M=F(m)$ and $m=F^{-1}(M)$. Unfortunately, it loses the homomorphic additional property;
 
+Avote simply use $M=mG$ to map value m to the point on the ellipse curve although there exist a flaw that we need to solve the discrete logarithm problem(DLP) when finding $m$ from $M$. Fortunately, we can seach it in finite time complexity. Now, we'll describe how Avote encodes a voter's ballot to value $m$. We treat a ballot as an $(N_{V}+1)$-ary numeral string
 
-Now, Here exists another problem: how to map a voter's ballot to value $m$? We treat a ballot as an $(N_{V}+1)$-ary numeral string
-
-$$m = \sum_{i=1}^{N_C}b_{C_i}*(N_V+1)^{N_C-i}$$
+$$m_{V_j} = \sum_{i=1}^{N_C}b_{{V_j}{C_i}}*(N_V+1)^{N_C-i}$$
 
 where $N_C$ is the number of the candidates, $N_V$ is the number of the voters, and
 
 $$
 \begin{cases}
-b_{C_i}=0, \text{if the voter doesn't vote the ${C_i}$'s candidate} \\
-b_{C_i}=1, \text{if the voter votes the ${C_i}$'s candidate}
+b_{{V_j}{C_i}}=0, \text{if the voter ${V_j}$ doesn't vote the ${C_i}$'s candidate} \\
+b_{{V_j}{C_i}}=1, \text{if the voter ${V_j}$ votes the ${C_i}$'s candidate}
 \end{cases}
 $$
 
 At the current Avote's version, a voter can only vote one candidate, so we have the constraint equation
 
 $$
-\sum_{i=0}^{N_C}b_{C_i}=1
+\sum_{i=0}^{N_C}b_{{V_j}{C_i}}=1
 $$
 
 On the other hand, if we know the value $m$, we can calculate 
 
 $$
 b_{C_i} = \left\lfloor{\tfrac{m}{(N_V+1)^{N_C-i}}}\right\rfloor \bmod (N_V+1)
+$$
+
+Our target is to find $m$ that $m=F^{-1}(M)$. Since $m=\sum_{j=1}^{N_V}{m_{V_j}}$, we know $m\leq2^{N_V+1}$, but that's not the minimal ceiling value. As we said before, each voter can vote one and only one candidate, so we have a contraint:
+
+$$
+  \sum_{i=1}^{N_C}b_{C_i}=N_V
+$$
+
+Accoding to [Stars and bars](https://en.wikipedia.org/wiki/Stars_and_bars_(combinatorics)) theorem, we get the searching space is
+
+$$
+C_{N_V+1}^{N_C-1} = \tfrac{(N_V+1)!}{(N_C-1)!(N_V-N_C+2)!}
 $$
 
 ### Zero-knowledge proof
