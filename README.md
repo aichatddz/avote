@@ -70,6 +70,27 @@ We need to design a function F that satisfies three conditions:
 2. We can calculte $M=F(m)$ and $m=F^{-1}(M)$ in acceptable time complexity.
 3. F should preserve the homomorphic additional property, that means $F(m_1)+F(m_2)=F(m_1+m_2)$
 
+...
+
+Now, Here exists another problem: how to map a voter's ballot to value $m$? We treat a ballot as an $(N_{V}+1)$-ary numeral string
+
+$$m = \sum_{i=1}^{N_C}b_{C_i}*(N_V+1)^{N_C-i}$$
+
+where $N_C$ is the number of the candidates, $N_V$ is the number of the voters, and
+
+$$
+\begin{cases}
+b_{C_i}=0, \text{if the voter doesn't vote the ${C_i}$'s candidate} \\
+b_{C_i}=1, \text{if the voter votes the ${C_i}$'s candidate}
+\end{cases}
+$$
+
+At the current Avote's version, a voter can only vote one candidate, so we have the constraint equation
+
+$$
+\sum_{i=0}^{N_C}b_{C_i}=1
+$$
+
 ### Zero-knowledge proof
 Zero-knowledge proof(ZKP) is a cryptograph method that allows one party(prover) to convince another party(verifier) that a statement is true without revealing any additional information beyond the validity of the statement itself. The key properties of ZKP is:
 
