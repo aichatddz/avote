@@ -64,13 +64,14 @@ C_{V2}-\sum_{j=1}^{N_T}{\omega_{T_j}} & =\sum_{i=1}^{N_V}C_{V_i2}-\sum_{j=1}^{N_
 \end{align}
 $$
 
-### How to map the ballot to the curve?
+### How to encode the ballot to the curve?
 We need to design a function F that satisfies three conditions:
 1. F is bijective. That means there exist one and only one point M that satisfies $M=F(m)$, and at the same time, there exists an inverse function $F^{-1}$ mapping $M$ to the unique value $m=F^{-1}(M)$
 2. We can calculte $M=F(m)$ and $m=F^{-1}(M)$ in acceptable time complexity.
 3. F should preserve the homomorphic additional property, that means $F(m_1)+F(m_2)=F(m_1+m_2)$
 
-...
+Koblitz encoding is popular used since it is bijective and easy to calculate $M=F(m)$ and $m=F^{-1}(M)$. Unfortunately, it loses the homomorphic additional property;
+
 
 Now, Here exists another problem: how to map a voter's ballot to value $m$? We treat a ballot as an $(N_{V}+1)$-ary numeral string
 
@@ -89,6 +90,12 @@ At the current Avote's version, a voter can only vote one candidate, so we have 
 
 $$
 \sum_{i=0}^{N_C}b_{C_i}=1
+$$
+
+On the other hand, if we know the value $m$, we can calculate 
+
+$$
+b_{C_i} = \left\lfloor{\tfrac{m}{(N_V+1)^{N_C-i}}}\right\rfloor \bmod (N_V+1)
 $$
 
 ### Zero-knowledge proof
