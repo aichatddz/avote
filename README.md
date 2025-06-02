@@ -237,7 +237,7 @@ Also, if k is too small, the attacker can use brute-force search to calculate k 
 So, the voter generate random k that satified:
 1. the voter's client should never cache the value of $k$ and destroy it when $k$ is used to encrypt a plaintext.
 2. k must be large enough;
-3. k must be not too large, also. Since it may be vulnerable to overflow attack. We'll talk about it next chapter.
+3. k must not be too large, also. Since it may be vulnerable to overflow attack. We'll talk about it next chapter.
 
 ### Overflow attack
 
