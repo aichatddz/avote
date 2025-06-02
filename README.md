@@ -31,8 +31,8 @@ In voting phase, each voter $V_i$ then use $Q = \sum_{i=1}^{N_T}Q_{T_i}$ as the 
 
 $$
 \begin{cases}
-C_{V_i1} = k_{V_i}G \\
-C_{V_i2} = M_{V_i} + k_{V_i}Q
+C_{V_i1} = k_{V_i}G&\text{(1)} \\
+C_{V_i2} = M_{V_i} + k_{V_i}Q&\text{(2)}
 \end{cases}
 $$
 
@@ -42,8 +42,8 @@ When all of the voters submit their ballots or the voting phase times out, the o
 
 $$
 \begin{cases}
-C_{V1} = \sum_{i=1}^{N_V}C_{V_i1} \\
-C_{V2} = \sum_{i=1}^{N_V}C_{V_i2}
+C_{V1} = \sum_{i=1}^{N_V}C_{V_i1}&\text{(3)} \\
+C_{V2} = \sum_{i=1}^{N_V}C_{V_i2}&\text{(4)}
 \end{cases}
 $$
 
@@ -60,7 +60,7 @@ C_{V2}-\sum_{j=1}^{N_T}{\omega_{T_j}} & =\sum_{i=1}^{N_V}C_{V_i2}-\sum_{j=1}^{N_
   & =\sum_{i=1}^{N_V}(M_{V_i} + k_{V_i}\sum_{j=1}^{N_T}Q_{T_j})-\sum_{j=1}^{N_T}(d_{T_j}\sum_{i=1}^{N_V}k_{V_i}G) \\
   & =\sum_{i=1}^{N_V}(M_{V_i} + k_{V_i}\sum_{j=1}^{N_T}d_{T_j}G)-\sum_{j=1}^{N_T}\sum_{i=1}^{N_V}d_{T_j}k_{V_i}G \\
   & =\sum_{i=1}^{N_V}M_{V_i} + \sum_{i=1}^{N_V}\sum_{j=1}^{N_T}k_{V_i}d_{T_j}G-\sum_{j=1}^{N_T}\sum_{i=1}^{N_V}d_{T_j}k_{V_i}G \\
-  & =\sum_{i=1}^{N_V}M_{V_i}
+  & =\sum_{i=1}^{N_V}M_{V_i} & \text{(5)}
 \end{align}
 $$
 
@@ -74,42 +74,44 @@ Koblitz encoding is popular used since it is bijective and easy to calculate $M=
 
 Avote simply use $M=mG$ to map value m to the point on the ellipse curve although there exist a flaw that we need to solve the discrete logarithm problem(DLP) when finding $m$ from $M$. Fortunately, we can seach it in finite time complexity. Now, we'll describe how Avote encodes a voter's ballot to value $m$. We treat a ballot as an $(N_{V}+1)$-ary numeral string
 
-$$m_{V_j} = \sum_{i=1}^{N_C}b_{{V_j}{C_i}}*(N_V+1)^{N_C-i}$$
+$$
+m_{V_j} = \sum_{i=1}^{N_C}b_{{V_j}{C_i}}*(N_V+1)^{N_C-i} \quad {(6)}
+$$
 
 where $N_C$ is the number of the candidates, $N_V$ is the number of the voters, and
 
 $$
 \begin{cases}
-b_{{V_j}{C_i}}=0, \text{if the voter ${V_j}$ doesn't vote the ${C_i}$'s candidate} \\
-b_{{V_j}{C_i}}=1, \text{if the voter ${V_j}$ votes the ${C_i}$'s candidate}
+b_{{V_j}{C_i}}=0, \text{if the voter ${V_j}$ doesn't vote the ${C_i}$'s candidate}&\text{(7)} \\
+b_{{V_j}{C_i}}=1, \text{if the voter ${V_j}$ votes the ${C_i}$'s candidate}&\text{(8)}
 \end{cases}
 $$
 
 At the current Avote's version, a voter can only vote one candidate, so we have the constraint equation
 
 $$
-\sum_{i=0}^{N_C}b_{{V_j}{C_i}}=1
+\sum_{i=0}^{N_C}b_{{V_j}{C_i}}=1 \quad{(9)}
 $$
 
 On the other hand, if we know the value $m$, we can calculate 
 
 $$
-b_{C_i} = \left\lfloor{\tfrac{m}{(N_V+1)^{N_C-i}}}\right\rfloor \bmod (N_V+1)
+b_{C_i} = \left\lfloor{\tfrac{m}{(N_V+1)^{N_C-i}}}\right\rfloor \bmod (N_V+1) \quad{(10)}
 $$
 
 Our target is to find $m$ that $m=F^{-1}(M)$. Since $m=\sum_{j=1}^{N_V}{m_{V_j}}$, we know $m\leq2^{N_V+1}$, but that's not the minimal ceiling value. As we said before, each voter can vote one and only one candidate, so we have a contraint:
 
 $$
-  \sum_{i=1}^{N_C}b_{C_i}=N_V
+  \sum_{i=1}^{N_C}b_{C_i}=N_V \quad{(11)}
 $$
 
 Accoding to [Stars and bars](https://en.wikipedia.org/wiki/Stars_and_bars_(combinatorics)) theorem, we get the searching space is
 
 $$
-C_{N_V+1}^{N_C-1} = \tfrac{(N_V+1)!}{(N_C-1)!(N_V-N_C+2)!}
+C_{N_V+1}^{N_C-1} = \tfrac{(N_V+1)!}{(N_C-1)!(N_V-N_C+2)!} \quad{(12)}
 $$
 
-Finally, we should be careful that EC-Elgamal may be at risk of differential attacks if the same random value k is used more than once or k is too small. We'll discuss this issue in [differential attack](#differential-attack)
+Finally, we should be careful that EC-Elgamal may be at risk of differential attacks if the same random value $k$ is used more than once or $k$ is too small. We'll discuss this issue in [differential attack](#differential-attack)
 
 ### Zero-knowledge proof
 Zero-knowledge proof(ZKP) is a cryptograph method that allows one party(prover) to convince another party(verifier) that a statement is true without revealing any additional information beyond the validity of the statement itself. The key properties of ZKP is:
@@ -203,13 +205,47 @@ sequenceDiagram
 ```
 
 # Attacks
+### Differential attack
+EC-Elgamal may be at risk of differential attack if the same random value $k$ is used more than once to encrypt different plaintext $m$. If we get two different ciphertext, that
+
+$$
+\begin{cases}
+C_1 = kG \quad & \text{(13)}\\
+C_2 = M + kQ \quad &\text{(14)}
+\end{cases}
+$$
+
+and
+
+$$
+\begin{cases}
+C_{1}{'} = kG \quad  & \text{(15)} \\
+C_{2}{'} = M' + kQ \quad  & \text{(16)}
+\end{cases}
+$$
+
+Subtract equation (14) from equation (16), we get
+
+$$
+  C_{2}{'} - C_{2} = M' - M
+$$
+
+Since $C_{2}'$ and $C_2$ is publicly known, It will reveal the difference between $M$ and $M'$, as well as the difference between $m$ and $m'$. Since $m$ and $m'$ are both small, the attacker can calculate it using brute-force search. Even more, if the attacker knows one value of $m$ and $m'$, he can calculate the other one easily.
+
+Also, if k is too small, the attacker can use brute-force search to calculate k according to equation (13) and use $k$ to calculate M attacording to equation (14).
+
+So, the voter generate random k that satified:
+1. the voter's client should never cache the value of $k$ and destroy it when $k$ is used to encrypt a plaintext.
+2. k must be large enough;
+3. k must be not too large, also. Since it may be vulnerable to overflow attack. We'll talk about it next chapter.
+
+### Overflow attack
+
 ### Double spending attack
 ### Reentrancy attack
-### Overflow attack
 ### Collusion attack
 ### Lazy validation attack
 ### Fake vote attack
-### Differential attack
 
 # More details
 
@@ -219,5 +255,4 @@ sequenceDiagram
 
 [Stars and bars (combinatorics)](https://en.wikipedia.org/wiki/Stars_and_bars_(combinatorics)) --wikipedia.org
 
-[Zero-knowledge proof
-](https://en.wikipedia.org/wiki/Zero-knowledge_proof) --wikipedia.org
+[Zero-knowledge proof](https://en.wikipedia.org/wiki/Zero-knowledge_proof) --wikipedia.org
