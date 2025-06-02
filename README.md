@@ -109,6 +109,8 @@ $$
 C_{N_V+1}^{N_C-1} = \tfrac{(N_V+1)!}{(N_C-1)!(N_V-N_C+2)!}
 $$
 
+Finally, we should be careful that EC-Elgamal may be at risk of differential attacks if the same random value k is used more than once or k is too small. We'll discuss this issue in [differential attack](#differential-attack)
+
 ### Zero-knowledge proof
 Zero-knowledge proof(ZKP) is a cryptograph method that allows one party(prover) to convince another party(verifier) that a statement is true without revealing any additional information beyond the validity of the statement itself. The key properties of ZKP is:
 
