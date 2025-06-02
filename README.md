@@ -242,13 +242,22 @@ So, the voter generate random k that satified:
 ### Overflow attack
 
 ### Double spending attack
-### Reentrancy attack
+At the current version, the contract stores the list of the voters' address. It's easy to prevent double spending attack, since the contract can verify if the voter has submitted a ballot before by searching the voter's address in the voted address list.
+
+But there's a flaw that all of the parties especially the sponsor knows who has submit a ballot or not. Some result may be easy to infer that the ballot is voted by which voter, for example, there's only one voter submit his ballot. In future version, the sponsor may initiate the vote by submitted the voters' public key merkle tree instead of the voters' addresses. In voting phase, the voter should prove that he knowns the private key which corrensponding public key is the leaf of the merkle tree and submit the hash of private key, the ciphertext and the proof. The contract will additionally stores the hash of private key in the used merkle tree for preventing double spending attack.
+
 ### Collusion attack
-### Lazy validation attack
+If all counter collude, they can decrypt all the ballots, thus all the privacy of the voter are revealed. Avote encourages the voter stakes tokens to be a counter if he is warried about collusion. Thus, in tallying phase, all cannot decrypt the source ballots without the voter's plaintext fragment.
+
+### Lazy attack
+If some counters didn't submit his plaintext fragment in time, all of the parties cannot get the tally result. At the current version, Avote will slash the tokens staked by the counter who is lazy tallying, and all of the other parties can unstake their own token.
+In future, maybe Avote will add another phase, called second-tallying phase. When the tallying phase failed to collect all the plaintext fragments, second-tallying phase will be activated. The second-tallying phase use threshold decryption.
+At initiated phase, each counter should submit two public keys, one for tallying phase and the other for second-tallying phase. At voting phase, each voter should submit two ciphertexts using these two public keys respectively. When tallying phase times out and the contract does not collect all the plaintext fragments, the tokens which staked by the lazy counters will be slashed and the second-tallying phase is activated.
+
 ### Fake vote attack
+Both voter and counter may be malicious. The voter may submit a encrypted ballot voting a unexisted candidate, e.g. there's 3 candidates, but the voter votes the 5th candidate. The counter may submit a fake plaintext fragment without using his correct private key. ZKP is important to prevent these attacks. When the voter submit his ballot, he should generate a proof to convice that he's ballot $b$ is satisfied $1\leq{b}\leq{N_C}$, and he encrypts data with the sepecified public key collectly. And in tallying phase, the counter should prove that he has the private key corresponding to the public key submitted in initiated phase and the plaintext fragment is decrypted with this private key correctly.
 
 # More details
-
 [Exploring Elliptic Curve Pairings](https://medium.com/@VitalikButerin/exploring-elliptic-curve-pairings-c73c1864e627) --Vitalik Buterin
 
 [An approximate introduction to how zk-SNARKs are possible](https://vitalik.eth.limo/general/2021/01/26/snarks.html) --Vitalik Buterin
