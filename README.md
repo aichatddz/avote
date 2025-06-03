@@ -105,7 +105,7 @@ $$
   \sum_{i=1}^{N_C}b_{C_i}=N_V \quad{(11)}
 $$
 
-Accoding to [Stars and bars](https://en.wikipedia.org/wiki/Stars_and_bars_(combinatorics)) theorem, we get the searching space is
+Accoding to [Stars and bars](https://en.wikipedia.org/wiki/Stars_and_bars_(combinatorics)) theorem, we get the searching space's size is
 
 $$
 C_{N_V+1}^{N_C-1} = \tfrac{(N_V+1)!}{(N_C-1)!(N_V-N_C+2)!} \quad{(12)}
@@ -237,9 +237,10 @@ Also, if k is too small, the attacker can use brute-force search to calculate k 
 So, the voter generate random k that satified:
 1. the voter's client should never cache the value of $k$ and destroy it when $k$ is used to encrypt a plaintext.
 2. k must be large enough;
-3. k must not be too large, also. Since it may be vulnerable to overflow attack. We'll talk about it next chapter.
+<!-- 3. k must not be too large, also. Since it may be vulnerable to overflow attack. We'll talk about it next chapter. -->
 
 ### Overflow attack
+As we know, the solidity programmers must pay special attention to overflow attack, especially addition operation and multiplication operation between two big integers. Similarly, circom programmers should guard against overflow attacks since arithmetic operations are performed in a finite field (modular arithmetic). Poor logical design may lead to security issues analogous to overflow attacks. We suggest using Num2Bits or LessThan in circomlib to explicitly restrict the bit length of inputs and evaluate the contraint logic whether it's at risk of overflow-like vulnerabilities.
 
 ### Double spending attack
 At the current version, the contract stores the list of the voters' address. It's easy to prevent double spending attack, since the contract can verify if the voter has submitted a ballot before by searching the voter's address in the voted address list.
@@ -249,7 +250,7 @@ But there's a flaw that all of the parties especially the sponsor knows who has 
 ### Collusion attack
 If all counter collude, they can decrypt all the ballots, thus all the privacy of the voter are revealed. Avote encourages the voter stakes tokens to be a counter if he is warried about collusion. Thus, in tallying phase, all cannot decrypt the source ballots without the voter's plaintext fragment.
 
-### Lazy attack
+### Lazy decrypted attack
 If some counters didn't submit his plaintext fragment in time, all of the parties cannot get the tally result. At the current version, Avote will slash the tokens staked by the counter who is lazy tallying, and all of the other parties can unstake their own token.
 In future, maybe Avote will add another phase, called second-tallying phase. When the tallying phase failed to collect all the plaintext fragments, second-tallying phase will be activated. The second-tallying phase use threshold decryption.
 At initiated phase, each counter should submit two public keys, one for tallying phase and the other for second-tallying phase. At voting phase, each voter should submit two ciphertexts using these two public keys respectively. When tallying phase times out and the contract does not collect all the plaintext fragments, the tokens which staked by the lazy counters will be slashed and the second-tallying phase is activated.
