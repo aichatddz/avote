@@ -1,33 +1,38 @@
 # Avote
 
-**Abstract**
+### Abstract
 Avote is a decentralized anonymous voting system on the Ethereum blockchain. The voting result and the voter participation can be verified publicly, but individual ballot selections remain cryptographically concealed. Avote operates with three distinct roles.
 
 **Sponsor**
+
 Anyone can be a sponsor by depositing specified amount of ETH and specifies who has voting rights.
 
 **Voter**
-Voter who has voting right can submitted his ballot. The ballots are cryptographically concealed so nobody knows what they submit but the ballots can be tallied by counters.
+
+Voter who has voting right can submit his ballot. The ballots are cryptographically concealed so nobody knows what others submit but the ballots can be tallied by counters.
 
 **Counter**
+
 To ensure system anonymity, the system introduces a group of counters as the third party to decrypt and tally ballots. The number of counters must be at least 2. To prevent collusion among counters, both the sponsor and voters can participate as counters by staking a required amount of ETH.
 
 # Foundations of cryptography
 ### Homomorphic Encryption
-To conceal ballots information without affecting tally, we first require a homomorphic encryption algorithm. Serveral different approaches can be employed to achieve this.
+To encrypt the ballot information without affecting the tallying process, a homomorphic encryption algorithm is required. Several different approaches can be employed to achieve this.
 
-**Paillier** is an additively homomorphic encryption scheme which security relies on hardness of the Composite Residuosity Problem(CRP), which is closely related to integer factorization.
+**Paillier** is an additively homomorphic encryption scheme whose security relies on the hardness of the Composite Residuosity Problem (CRP) - a problem closely linked to integer factorization.
 
-**Elgamal** is a multiplicative homomorphic encryption scheme which security relies on hardness of Discrete Logarithm Problem(DLP).
+**ElGamal** is a multiplicatively homomorphic encryption scheme whose security relies on the hardness of Discrete Logarithm Problem (DLP).
 
-**EC-Elgamal** is like Elgamal that it's security relies on hardness of DLP, but it runs ellipse curve. It's an additively homomorphic encryption. 
+**EC-ElGamal** is similar to ElGamal in that it's security relies on the hardness of DLP. Howerer it operates over ellipse curve and provides additive homomorphism. 
 
-We chose EC-Elgamal because it's more efficient due to its smaller key size. More importantly, EC-Elgamal is zero-knownledge-friendly, allowing easily implementation in circom, as well as in c/c++, golang and javascript.
+We selected EC-Elgamal for it's efficiency primarily due to its smaller key size. More importantly, EC-Elgamal is zero-knowledge-friendly, enabling straightforward implementation in Circom, as well as in C/C++, Golang and JavaScript.
 
 ### How does EC-Elgamal work?
-In circom, EC-Elgamal is base on baby jubjub curve(one kind of ellipse curves) due to it's zero-knownledge-friendly. It's asymmetric encryption. Each counter $T_i$ generates a private key $d_{T_i}$, and publishes his public key $Q_{T_i} = d_{T_i}G$ on the contract, while G is base point on the curve. Suppose there are $N_T$ counters submit their public key $Q_i$ and the machine state changed to voting.
+In Circom, EC-Elgamal is implemented using Baby Jubjub curve(a special elliptic curve) due to its zero-knownledge-friendly properties. As an asymmetric encryption encryption scheme, each counter $T_i$ generates a private key $d_{T_i}$, and publishes their public key $Q_{T_i} = d_{T_i}G$ on the contract, where G is the base point on the curve.
 
-In voting phase, each voter $V_i$ then use $Q = \sum_{i=1}^{N_T}Q_{T_i}$ as the public key to encrypt their ballots and then publish their ciphertext on the contract. The ciphertext is consists of two points, $(C_{V_i1}, C_{V_i2})$, where 
+Suppose $N_T$ counters submit their public key $Q_i$ and the system transitions to voting.
+
+During the voting phase, each voter $V_i$ uses the aggregated public key $Q = \sum_{i=1}^{N_T}Q_{T_i}$ to encrypt their ballots and then publish their ciphertext on the contract. The ciphertext comprise two points, $(C_{V_i1}, C_{V_i2})$, where 
 
 $$
 \begin{cases}
@@ -36,9 +41,9 @@ C_{V_i2} = M_{V_i} + k_{V_i}Q&\text{(2)}
 \end{cases}
 $$
 
-where $k_{V_i}$ is a random big number than less than the suborder of the curve, and $M_{V_i}$ is the point that mapped from the ${V_i}$'s ballot value. There exists an interesting problem that how to map the ballot value $m_{v_i}$ to $M_{V_i}$. We'll discuss this issue later, and for now, we temporarily denote this mapping function as $M=\Phi({m})$.
+where $k_{V_i}$ is a randomly generated large integer less than the curve's suborder, and $M_{V_i}$ is the curve point obtained by mapping the ballot value $m_{V_i}$ of voter ${V_i}$. A critical challenge arises in constructing this mapping from $m_{V_i}$ to $M_{V_i}$. We defer a detailed discussion and provisionally represent the mapping function as $M=\Phi({m})$.
 
-When all of the voters submit their ballots or the voting phase times out, the oracle will calculate the sum of the ciphertexts as $(C_{V1}, C_{V2})$, while
+Once all voters submit their ballots or the voting phase timeout is reached, the oracle aggregates the ciphertexts, yielding the combined result as $(C_{V1}, C_{V2})$, while
 
 $$
 \begin{cases}
@@ -47,9 +52,9 @@ C_{V2} = \sum_{i=1}^{N_V}C_{V_i2}&\text{(4)}
 \end{cases}
 $$
 
-In tallying phase, each counter calculate the product of $C_{V1}$ and their own private key $d_{T_i}$, denoted as $\omega_{T_i}=d_{T_i}C_{V1}$, and submit it to the contract.
+During hte tallying phase, each counter computes the product of $C_{V1}$ and their respective private key $d_{T_i}$, resulting in $\omega_{T_i}=d_{T_i}C_{V1}$, and submits this value to the smart contract.
 
-Finally, the oracle decrypt the plaintext sum of ${M_{V_i}}$, denoted as $M=\sum_{i=1}^{N_V}M_{V_i}$ by calculating $M=C_{V2}-\sum_{i=1}^{N_T}{\omega_{T_i}}$
+Finally, the oracle decrypts the aggregated plaintext $M=\sum_{i=1}^{N_V}M_{V_i}$ by computing $M=C_{V2}-\sum_{i=1}^{N_T}{\omega_{T_i}}$
 
 Why does this hold true? Because
 
@@ -64,15 +69,20 @@ C_{V2}-\sum_{j=1}^{N_T}{\omega_{T_j}} & =\sum_{i=1}^{N_V}C_{V_i2}-\sum_{j=1}^{N_
 \end{align}
 $$
 
-### How to encode the ballot to the curve?
-We need to design a function F that satisfies three conditions:
-1. F is bijective. That means there exist one and only one point M that satisfies $M=F(m)$, and at the same time, there exists an inverse function $F^{-1}$ mapping $M$ to the unique value $m=F^{-1}(M)$
-2. We can calculte $M=F(m)$ and $m=F^{-1}(M)$ in acceptable time complexity.
-3. F should preserve the homomorphic additional property, that means $F(m_1)+F(m_2)=F(m_1+m_2)$
+### How is the ballot encoded to the curve?
+We require a function $F: {\mu}\rightarrow{\xi}$ mapping plaintext ballots $m\in{\mu}$ to elliptic curve point $M\in{\xi}$, satisfying:
+1. Bijectivity, meaning that
+   
+$$
+\forall{m\in{\mu}}, \exists{M\in{\xi}}\text{, such that }M=F(m)\cap\exists{F^{-1}}\text{, where }F^{-1}(M)=m
+$$
+      
+2. Efficient Computation. Both $M=F(m)$ and $m=F^{-1}(M)$ are computable in polynomial time.
+3. Homomorphism. $F$ should preserve the homomorphic additional property: $F(m_1)+F(m_2)=F(m_1+m_2)$
 
-Koblitz encoding is popular used since it is bijective and easy to calculate $M=F(m)$ and $m=F^{-1}(M)$. Unfortunately, it loses the homomorphic additional property;
+Koblitz encoding is commonly used since it is bijective and allows efficient computation of both $M=F(m)$ and $m=F^{-1}(M)$. Unfortunately, it loses the additional homomorphic property;
 
-Avote simply use $M=mG$ to map value m to the point on the ellipse curve although there exist a flaw that we need to solve the discrete logarithm problem(DLP) when finding $m$ from $M$. Fortunately, we can seach it in finite time complexity. Now, we'll describe how Avote encodes a voter's ballot to value $m$. We treat a ballot as an $(N_{V}+1)$-ary numeral string
+Avote simply uses $M=mG$ to map value m to the point on the elliptic curve although there exists a flaw that we need to solve the discrete logarithm problem (DLP) when finding $m$ from $M$. Fortunately, we can search for it in polynomial time. Now, we'll describe how Avote encodes a voter's ballot to a value $m$. We treat a ballot as an $(N_{V}+1)$-ary number.
 
 $$
 m_{V_j} = \sum_{i=1}^{N_C}b_{{V_j}{C_i}}*(N_V+1)^{N_C-i} \quad {(6)}
@@ -87,31 +97,35 @@ b_{{V_j}{C_i}}=1, \text{if the voter ${V_j}$ votes the ${C_i}$'s candidate}&\tex
 \end{cases}
 $$
 
-At the current Avote's version, a voter can only vote one candidate, so we have the constraint equation
+In the current version of Avote, each voter selects exactly one candidate, which gives us the constraint equation
 
 $$
 \sum_{i=0}^{N_C}b_{{V_j}{C_i}}=1 \quad{(9)}
 $$
 
-On the other hand, if we know the value $m$, we can calculate 
+On the other hand, if we know the value $m$, we can compute 
 
 $$
 b_{C_i} = \left\lfloor{\tfrac{m}{(N_V+1)^{N_C-i}}}\right\rfloor \bmod (N_V+1) \quad{(10)}
 $$
 
-Our target is to find $m$ that $m=F^{-1}(M)$. Since $m=\sum_{j=1}^{N_V}{m_{V_j}}$, we know $m\leq2^{N_V+1}$, but that's not the minimal ceiling value. As we said before, each voter can vote one and only one candidate, so we have a contraint:
+Our objective is to find $m$ such that $m=F^{-1}(M)$. Given that $m=\sum_{j=1}^{N_V}{m_{V_j}}$, we know $m\leq2^{N_V+1}$. However, this is not represent the minimal upper bound. As previously established, each voter can select exactly one candidate, which introduces the following constraint:
 
 $$
   \sum_{i=1}^{N_C}b_{C_i}=N_V \quad{(11)}
 $$
 
-Accoding to [Stars and bars](https://en.wikipedia.org/wiki/Stars_and_bars_(combinatorics)) theorem, we get the searching space's size is
+According to the [Stars and bars](https://en.wikipedia.org/wiki/Stars_and_bars_(combinatorics)) theorem, we get the search space size equals
 
 $$
 C_{N_V+1}^{N_C-1} = \tfrac{(N_V+1)!}{(N_C-1)!(N_V-N_C+2)!} \quad{(12)}
 $$
 
-Finally, we should be careful that EC-Elgamal may be at risk of differential attacks if the same random value $k$ is used more than once or $k$ is too small. We'll discuss this issue in [differential attack](#differential-attack)
+Finally, we must account for the fact that EC-ElGamal may be vulnerable to differential attacks if:
+1. the same random value $k$ is reused, or,
+2. $k$ is chosen from a insufficiently large space.
+
+See [differential attack](#differential-attack) for more details.
 
 ### Zero-knowledge proof
 Zero-knowledge proof(ZKP) is a cryptograph method that allows one party(prover) to convince another party(verifier) that a statement is true without revealing any additional information beyond the validity of the statement itself. The key properties of ZKP is:
@@ -240,7 +254,7 @@ So, the voter generate random k that satified:
 <!-- 3. k must not be too large, also. Since it may be vulnerable to overflow attack. We'll talk about it next chapter. -->
 
 ### Overflow attack
-As we know, the solidity programmers must pay special attention to overflow attack, especially addition operation and multiplication operation between two big integers. Similarly, circom programmers should guard against overflow attacks since arithmetic operations are performed in a finite field (modular arithmetic). Poor logical design may lead to security issues analogous to overflow attacks. We suggest using Num2Bits or LessThan in circomlib to explicitly restrict the bit length of inputs and evaluate the contraint logic whether it's at risk of overflow-like vulnerabilities.
+As we know, the solidity programmers must pay special attention to overflow attack, especially addition operation and multiplication operation between two big integers. Similarly, Circom programmers should guard against overflow attacks since arithmetic operations are performed in a finite field (modular arithmetic). Poor logical design may lead to security issues analogous to overflow attacks. We suggest using Num2Bits or LessThan in circomlib to explicitly restrict the bit length of inputs and evaluate the contraint logic whether it's at risk of overflow-like vulnerabilities.
 
 ### Double spending attack
 At the current version, the contract stores the list of the voters' address. It's easy to prevent double spending attack, since the contract can verify if the voter has submitted a ballot before by searching the voter's address in the voted address list.
