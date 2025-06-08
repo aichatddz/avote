@@ -32,7 +32,8 @@ interface TestState {
     expiredBlock: bigint;
     sumPublicKey: Util.BigPoint;
     sumVotes: Util.BigCipher;
-    decryptResultPoint: Util.BigPoint;
+    // decryptResultPoint: Util.BigPoint;
+    tally: bigint[];
 }
 
 var testCandidates: readonly `0x${string}`[] = [
@@ -157,7 +158,8 @@ export function InitiatedStateStart(): TestState {
       expiredBlock: 11n,
       sumPublicKey: zeroPoint,
       sumVotes: {c1: zeroPoint, c2: zeroPoint},
-      decryptResultPoint: zeroPoint,
+      // decryptResultPoint: zeroPoint,
+      tally: [],
   };
 }
 
@@ -173,7 +175,8 @@ export function InitiatedStateEnd(): TestState {
       expiredBlock: 11n,
       sumPublicKey: zeroPoint,
       sumVotes: {c1: zeroPoint, c2: zeroPoint},
-      decryptResultPoint: zeroPoint,
+      // decryptResultPoint: zeroPoint,
+      tally: [],
   };
 }
 
@@ -189,7 +192,8 @@ export function VotingStateStart(): TestState {
       expiredBlock: 11n,
       sumPublicKey: testSumPublicKeys,
       sumVotes: {c1: zeroPoint, c2: zeroPoint},
-      decryptResultPoint: zeroPoint,
+      // decryptResultPoint: zeroPoint,
+      tally: [],
   };
 }
 
@@ -205,7 +209,8 @@ export function VotingStateEnd(): TestState {
       expiredBlock: 11n,
       sumPublicKey: testSumPublicKeys,
       sumVotes: {c1: zeroPoint, c2: zeroPoint},
-      decryptResultPoint: zeroPoint,
+      // decryptResultPoint: zeroPoint,
+      tally: [],
   };
 }
 
@@ -221,7 +226,8 @@ export function TallyingStateStart(): TestState {
       expiredBlock: 11n,
       sumPublicKey: testSumPublicKeys,
       sumVotes: testSumBallots,
-      decryptResultPoint: zeroPoint,
+      // decryptResultPoint: zeroPoint,
+      tally: [],
   };
 }
 
@@ -237,7 +243,8 @@ export function TallyingStateEnd(): TestState {
       expiredBlock: 11n,
       sumPublicKey: testSumPublicKeys,
       sumVotes: testSumBallots,
-      decryptResultPoint: zeroPoint,
+      // decryptResultPoint: zeroPoint,
+      tally: [],
   };
 }
 
@@ -253,10 +260,11 @@ export function PublishedState(): TestState {
       expiredBlock: 11n,
       sumPublicKey: testSumPublicKeys,
       sumVotes: testSumBallots,
-      decryptResultPoint: {
-        x: 537763545821696896074724415126079910619566248421975926508374659816758533755n,
-        y: 305233655587641910072179831927595858899726021466577042367261277343467587699n
-      },
+      // decryptResultPoint: {
+      //   x: 537763545821696896074724415126079910619566248421975926508374659816758533755n,
+      //   y: 305233655587641910072179831927595858899726021466577042367261277343467587699n,
+      // },
+      tally: [3n, 1n, 1n, 0n, 0n],
   };
 }
 
@@ -264,7 +272,7 @@ export async function deployFixture() {
     const accounts = await hre.viem.getWalletClients();
  
     const voteVerifier = await hre.viem.deployContract("contracts/circuit/vote_verifier.sol:Groth16Verifier", [], {});
-    const publicKeyVerifier = await hre.viem.deployContract("contracts/circuit/publickey_verifier.sol:Groth16Verifier", [], {});
+    const publicKeyVerifier = await hre.viem.deployContract("contracts/circuit/public_key_verifier.sol:Groth16Verifier", [], {});
     const decryptVerifier = await hre.viem.deployContract("contracts/circuit/decrypt_verifier.sol:Groth16Verifier", [], {});
     const avote = await hre.viem.deployContract("AvoteForTest", [voteVerifier.address, publicKeyVerifier.address, decryptVerifier.address], {});
 

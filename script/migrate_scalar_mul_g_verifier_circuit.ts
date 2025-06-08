@@ -1,15 +1,12 @@
 import "@nomicfoundation/hardhat-toolbox-viem/network-helpers";
 import hre from "hardhat";
 import { sepolia } from 'viem/chains'
-import { createWalletClient, http } from "viem"
+import {createPublicClient, createWalletClient, http} from "viem"
 import { privateKeyToAccount } from "viem/accounts";
 import { configDotenv } from "dotenv"
 import { resolve } from "path";
+import Conf from "./config";
 import { AvoteProxy } from "../deployments/contracts";
-
-// const COUNTER: `0x${string}` = "0xCB643869a723B88B93F84100481194B39c5c7623"; // counter 1
-// const COUNTER: `0x${string}` = "0x752164ACdba08F42DBbD7FfeEd1d415165bD5613"; // counter 2
-const COUNTER: `0x${string}` = "0xEDb7da8323C16A2937857a0155f5041Ebcd47B61"; // counter 3
 
 async function main() {
     configDotenv({ path: resolve(__dirname, "./.env") })    
@@ -30,16 +27,16 @@ async function main() {
         chain: sepolia,
         transport: http(`https://eth-sepolia.g.alchemy.com/v2/${SEPOLIA_ALCHEMY_AK}`),
     });
-    
+
     const avote = await hre.viem.getContractAt("Avote", AvoteProxy, {
         client: {wallet: walletClient}
     })
-    await avote.write.AddCounter([COUNTER]);
+    await avote.write.MigrateScalarMulGCircuit(["0x1c393a10866b9363062fef35792ae29cd1557221"]);
     
 }
 
 main().then(()=>{
-    console.log("add counter succeed");
+    console.log("migrate scalar_mul_g_verifier succeed");
 }).catch((error) => {
     console.error(error);
     process.exit(1);

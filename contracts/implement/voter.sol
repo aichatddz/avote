@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {IAvote, Cipher, Point, VoteInfo, Proof, SumProof} from "../base/interfaces.sol";
+import {IAvote, Cipher, Point, VoteInfo, Proof, SumProof, TallyProof} from "../base/interfaces.sol";
 import {Groth16Verifier as VoteVerifier} from "../circuit/vote_verifier.sol";
-import {Groth16Verifier as PublicKeyVerifier} from "../circuit/publickey_verifier.sol";
+import {Groth16Verifier as ScalarMulGVerifier} from "../circuit/scalar_mul_g_verifier.sol";
 import {Groth16Verifier as DecryptVerifier} from "../circuit/decrypt_verifier.sol";
 import {Groth16Verifier as SumVerifier} from "../circuit/check_sum_verifier.sol";
+import {Groth16Verifier as PublicKeyVerifier} from "../circuit/public_key_verifier.sol";
 
 import "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
@@ -29,30 +30,24 @@ contract Avote is IAvote, Initializable, OwnableUpgradeable, UUPSUpgradeable  {
     uint256 private constant PUBLIC_SIGNAL_SIZE = WINDOW_SIZE * 2+ 2;
     // Point private ZERO_POINT;
 
-    VoteVerifier voteVerifier;
-    PublicKeyVerifier publicKeyVerifier;
-    DecryptVerifier decryptVerifier;
-    SumVerifier sumVerifier;
+    VoteVerifier public voteVerifier;
+    ScalarMulGVerifier public scalarMulGVerifier;
+    DecryptVerifier public decryptVerifier;
+    SumVerifier public sumVerifier;
+    PublicKeyVerifier public publicKeyVerifier;
     address[] public validCounters;
     mapping (uint256=>VoteInfo) voteInfos;  // mapping vote id to voteInfo
-
-    // constructor(address _voteVerifier, address _publicKeyVerifier, address _decryptVerifier) initializer {
-    //     voteVerifier = VoteVerifier(_voteVerifier);
-    //     publicKeyVerifier = PublicKeyVerifier(_publicKeyVerifier);
-    //     decryptVerifier = DecryptVerifier(_decryptVerifier);
-
-    //     __Ownable_init(_msgSender());
-    // }
 
     function getZeroPoint() public pure returns (Point memory) {
         return Point(0, 1);
     }
 
-    function initialize(address _voteVerifier, address _publicKeyVerifier, address _decryptVerifier, address _check_sum_verifier) public initializer {
+    function initialize(address _voteVerifier, address _publicKeyVerifier, address _decryptVerifier, address _sumVerifier, address _scalarMulGVerifier) public initializer {
         voteVerifier = VoteVerifier(_voteVerifier);
         publicKeyVerifier = PublicKeyVerifier(_publicKeyVerifier);
         decryptVerifier = DecryptVerifier(_decryptVerifier);
-        sumVerifier = SumVerifier(_check_sum_verifier);
+        sumVerifier = SumVerifier(_sumVerifier);
+        scalarMulGVerifier = ScalarMulGVerifier(_scalarMulGVerifier);
         __Ownable_init(_msgSender());
     }
 
@@ -117,7 +112,8 @@ contract Avote is IAvote, Initializable, OwnableUpgradeable, UUPSUpgradeable  {
             expiredBlock: block.number + initiateStateBlockNumbers,
             sumPublicKey: Point({x: 0, y: 1}),
             sumVotes: Cipher({c1: getZeroPoint(), c2: getZeroPoint()}),
-            decryptResultPoint: Point({x: 0, y: 1})
+            // decryptResultPoint: Point({x: 0, y: 1})
+            tally: new uint256[](0)
         });
         emit ChangeStateLog(id, STATE_INITIATED);
     }
@@ -204,11 +200,12 @@ contract Avote is IAvote, Initializable, OwnableUpgradeable, UUPSUpgradeable  {
         emit ChangeStateLog(id, STATE_TALLYING);
     }
 
-    function ChangeStateToPublished(uint256 id, SumProof[] memory proofs) external {
+    function ChangeStateToPublished(uint256 id, SumProof[] memory proofs, TallyProof memory tallyProof) external {
         require(voteInfos[id].state == STATE_TALLYING, "state is not tallying");
         require(validCounters.length == voteInfos[id].counterPublicKeys.length || 
             voteInfos[id].expiredBlock <= block.number, "cannot change state yet");
         require((voteInfos[id].decryptPoints.length-1) / (WINDOW_SIZE-1) + 1 == proofs.length, "the length of proofs is not match with the decryptPoints' number");
+        require(tallyProof.tally.length == voteInfos[id].voters.length, "tally size is not equal to proof tally size");
 
         Point[] memory points = new Point[](voteInfos[id].decryptPoints.length + 1);
         points[0] = voteInfos[id].sumVotes.c2;
@@ -220,8 +217,17 @@ contract Avote is IAvote, Initializable, OwnableUpgradeable, UUPSUpgradeable  {
         }
         require(verifySum(proofs, points), "check the sum failed");
 
+        uint256 scalar;
+        for (uint256 i = 0; i < voteInfos[id].voters.length; i++) {
+            scalar += tallyProof.tally[i] * (voteInfos[id].voters.length+1) ** (voteInfos[id].candidates.length-1-i);
+        }
+        require(scalarMulGVerifier.verifyProof(tallyProof.proof.a, tallyProof.proof.b, tallyProof.proof.c,
+            [scalar, proofs[proofs.length-1].sum.x, proofs[proofs.length-1].sum.y]), string.concat("scalar mul G proof invalid: ",
+             Strings.toString(proofs[proofs.length-1].sum.x), ",", Strings.toString(proofs[proofs.length-1].sum.y)));
+
         voteInfos[id].state = STATE_PUBLISHED;
-        voteInfos[id].decryptResultPoint = proofs[proofs.length-1].sum;
+        // voteInfos[id].decryptResultPoint = proofs[proofs.length-1].sum;
+        voteInfos[id].tally = tallyProof.tally;
 
         emit ChangeStateLog(id, STATE_PUBLISHED);
     }
@@ -265,5 +271,13 @@ contract Avote is IAvote, Initializable, OwnableUpgradeable, UUPSUpgradeable  {
 
     function GetVoteInfo(uint256 id) view external returns(VoteInfo memory) {
         return voteInfos[id];
+    }
+
+    function MigrateScalarMulGCircuit(address newAddress) external onlyOwner {
+        scalarMulGVerifier = ScalarMulGVerifier(newAddress);
+    }
+
+    function MigratePublicKeyCircuit(address newAddress) external onlyOwner {
+        publicKeyVerifier = PublicKeyVerifier(newAddress);
     }
 }

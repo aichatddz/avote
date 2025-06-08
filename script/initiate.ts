@@ -7,6 +7,8 @@ import {createPublicClient, createWalletClient, http} from "viem"
 import { privateKeyToAccount } from "viem/accounts";
 import { configDotenv } from "dotenv"
 import { resolve } from "path";
+import Conf from "./config";
+import { AvoteProxy } from "../deployments/contracts";
 
 async function main() {
     configDotenv({ path: resolve(__dirname, "./.env") })    
@@ -37,7 +39,7 @@ async function main() {
     // let info = await avote.read.GetVoteInfo([1n]);
 
     // for (let i = 1; i <= 3; i++) {
-        const avote = await hre.viem.getContractAt("Avote", "0x9A82Db3a845359D3cBD8809d7f1A0e8A7BaeB979", {
+        const avote = await hre.viem.getContractAt("Avote", AvoteProxy, {
             client: {wallet: walletClient}
         })
         await avote.write.AddCounter([accounts[3].account.address]);

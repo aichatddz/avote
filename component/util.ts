@@ -17,6 +17,11 @@ export interface SumProof {
     sum: BigPoint;
 }
 
+export interface PublishProof {
+    proof: Proof;
+    tally: bigint[];
+}
+
 export function toBigPoint(curve: BabyJub, p: Point): BigPoint {
     return {
         x: ethers.toBigInt(curve.F.toString(p[0])),
@@ -67,4 +72,43 @@ export function decode(curve: BabyJub, dMulC1: BigPoint, c2: BigPoint): BigPoint
 
 export function randomScalar(curve: BabyJub): bigint {
     return ethers.toBigInt(ethers.randomBytes(32)) % curve.subOrder;
+}
+
+function search(curve: BabyJub, target: Point, base: bigint, voterNumber: bigint, remainVoters: bigint, state: bigint[]): bigint[] {
+
+    if (base == 1n) {
+        state.push(remainVoters);
+        // console.log(state);
+        let cur = toBigPoint(curve, curve.mulPointEscalar(curve.Base8, remainVoters));
+        let t = toBigPoint(curve, target);
+        if (t.x == cur.x && t.y == cur.y) {
+            return state
+        } else {
+            state.pop();
+            return []
+        }
+    }
+
+    for (let v = 0n; v <= remainVoters; v = v + 1n) {
+        let subtracter = base * v;
+        let point = toBigPoint(curve, curve.mulPointEscalar(curve.Base8, subtracter));
+        let negPoint: BigPoint = {
+            x: -point.x,
+            y: point.y
+        }
+        let remainPoint: Point = curve.addPoint(target, toPoint(curve, negPoint))
+        let nextBase: bigint = base / (voterNumber+1n)
+        state.push(v)
+        if (search(curve, remainPoint, nextBase, voterNumber, remainVoters-v, state).length > 0) {
+            return state;
+        }
+        state.pop();
+    }
+    return [];
+}
+
+export function DecodePointToScalar(curve: BabyJub, target: Point, voters: bigint, counters: bigint): bigint[] {
+    let base = (voters+1n) ** (counters-1n);
+    // console.log(toBigPoint(curve, target));
+    return search(curve, target, base, voters, voters, [])
 }

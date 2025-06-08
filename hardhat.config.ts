@@ -34,7 +34,7 @@ const config: HardhatUserConfig = {
         accounts: [`${SEPOLIA_PK_ONE}`],
       },
   },
-  
 };
 
 export default config;
+

@@ -1,12 +1,9 @@
-import { loadFixture } from "@nomicfoundation/hardhat-toolbox-viem/network-helpers";
 import "@nomicfoundation/hardhat-toolbox-viem/network-helpers";
 import hre from "hardhat";
-import * as fixtureTest from "../test/fixture"
-import { sepolia } from 'viem/chains'
-import {createPublicClient, createWalletClient, http} from "viem"
-import { privateKeyToAccount } from "viem/accounts";
 import { configDotenv } from "dotenv"
 import { resolve } from "path";
+import Conf from "./config";
+import { AvoteProxy } from "../deployments/contracts";
 
 async function main() {
     configDotenv({ path: resolve(__dirname, "./.env") })    
@@ -21,32 +18,31 @@ async function main() {
         throw new Error("Please set your SEPOLIA_ALCHEMY_AK in a .env file")
     }
 
-    // const rpcUrl = SEPOLIA_ALCHEMY_AK
-    // let walletClient = createWalletClient({
-    //     account: account,
-    //     chain: sepolia,
-    //     transport: http(`https://eth-sepolia.g.alchemy.com/v2/${SEPOLIA_ALCHEMY_AK}`),
-    // });
-    const publicClient = createPublicClient({
-        chain: sepolia,
-        transport: http(`https://eth-sepolia.g.alchemy.com/v2/${SEPOLIA_ALCHEMY_AK}`),
-    })
-    // const accounts = await hre.viem.getWalletClients();
-
-    const avote = await hre.viem.getContractAt("Avote", "0x9A82Db3a845359D3cBD8809d7f1A0e8A7BaeB979", {})
+    const avote = await hre.viem.getContractAt("Avote", AvoteProxy, {})
 
     let voteInfo = await avote.read.GetVoteInfo([1n]);
     console.log("voteInfo: ", voteInfo);
-    let counters = await avote.read.validCounters([0n]);
-    console.log("counters: ", counters);
-    counters = await avote.read.validCounters([1n]);
-    console.log("counters: ", counters);
-    counters = await avote.read.validCounters([2n]);
-    console.log("counters: ", counters);
-    counters = await avote.read.validCounters([3n]);
-    console.log("counters: ", counters);
-    counters = await avote.read.validCounters([4n]);
-    console.log("counters: ", counters);
+    let counter1 = await avote.read.validCounters([0n]);
+    console.log("counter1: ", counter1);
+    let counter2 = await avote.read.validCounters([1n]);
+    console.log("counter2: ", counter2);
+    let counter3 = await avote.read.validCounters([2n]);
+    console.log("counter3: ", counter3);
+
+    const publickeyVerifier = await avote.read.publicKeyVerifier();
+    console.log("publickeyVerifier: ", publickeyVerifier);
+
+    const voteVerifier = await avote.read.voteVerifier();
+    console.log("voteVerifier: ", voteVerifier);
+
+    const sumVerifier = await avote.read.sumVerifier();
+    console.log("sumVerifier: ", sumVerifier);
+
+    const decryptVerifier = await avote.read.decryptVerifier();
+    console.log("decryptVerifier: ", decryptVerifier);
+
+    const scalarMulGVerifier = await avote.read.scalarMulGVerifier();
+    console.log("scalarMulGVerifier: ", scalarMulGVerifier);
 }
 
 main().then(()=>{
