@@ -1,13 +1,9 @@
-import {
-  time,
-  loadFixture,
-} from "@nomicfoundation/hardhat-toolbox-viem/network-helpers";
+import { loadFixture } from "@nomicfoundation/hardhat-toolbox-viem/network-helpers";
 import { expect } from "chai";
 import hre from "hardhat";
 import * as Util from "../component/util"
 import * as Prover from "../component/prover"
 import * as fixtureTest from "./fixture"
-import { bigint } from "hardhat/internal/core/params/argumentTypes";
 
 describe("Verifier", function () {
   it("Should initiate a vote successfully", async function () {
@@ -47,7 +43,7 @@ describe("Verifier", function () {
         privateKey: fixture.counterTestValues[i].private,
       });
       let cli = await hre.viem.getContractAt("Avote", fixture.avote.address, {
-        client: { wallet: fixture.accounts[1]},
+        client: { wallet: fixture.accounts[i+1]},
       })
       const rsp = await cli.write.SubmitPublicKey([fixture.voteId, ...proof]);
       await fixture.publicClient.waitForTransactionReceipt({hash: rsp});

@@ -2,6 +2,11 @@ import * as Util from "../component/util";
 import hre from "hardhat";
 import * as CircomLib from "circomlibjs";
 
+// PublicKeyCircuit: 0x5bb54c5c11966492106ea1b8dce691f58b5f3fa9
+// DecryptCircuit: 0xa6b401198ff094111692edbfbb7c958854a387a3
+// VoterCircuit: 0x43e7ca2dd749da623d6c279e214422af617421fa
+// CheckSumCircuit: 0x93fb05f8ffa5984d651d71849b84c190f00c0cf3
+
 interface VoterTestValue {
   private: bigint;  // it's not used yet
   value: bigint;
@@ -248,7 +253,7 @@ export function PublishedState(): TestState {
       candidates: testCandidates,
       voters: testVoters,
       sponporEthers: 1n,
-      state: 3,
+      state: 4,
       counterPublicKeys: testCounterPublicKeys,
       ballots: testBallots,
       decryptPoints: testDecryptPoints,
@@ -267,7 +272,7 @@ export async function deployFixture() {
     const accounts = await hre.viem.getWalletClients();
  
     const voteVerifier = await hre.viem.deployContract("contracts/circuit/vote_verifier.sol:Groth16Verifier", [], {});
-    const publicKeyVerifier = await hre.viem.deployContract("contracts/circuit/scalar_mul_g_verifier.sol:Groth16Verifier", [], {});
+    const publicKeyVerifier = await hre.viem.deployContract("contracts/circuit/public_key_verifier.sol:Groth16Verifier", [], {});
     const decryptVerifier = await hre.viem.deployContract("contracts/circuit/decrypt_verifier.sol:Groth16Verifier", [], {});
     const avote = await hre.viem.deployContract("AvoteForTest", [voteVerifier.address, publicKeyVerifier.address, decryptVerifier.address], {});
 

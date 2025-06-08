@@ -1,79 +1,59 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {IVoter, ICounter, Point, Cipher, ISponsor} from "../base/interfaces.sol";
+import {IAvote, Cipher, Point, VoteInfo, Proof, SumProof, TallyProof} from "../base/interfaces.sol";
 import {Groth16Verifier as VoteVerifier} from "../circuit/vote_verifier.sol";
 import {Groth16Verifier as ScalarMulGVerifier} from "../circuit/scalar_mul_g_verifier.sol";
 import {Groth16Verifier as DecryptVerifier} from "../circuit/decrypt_verifier.sol";
 import {Groth16Verifier as SumVerifier} from "../circuit/check_sum_verifier.sol";
 import {Groth16Verifier as PublicKeyVerifier} from "../circuit/public_key_verifier.sol";
+
+import "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 
-struct VoteInfo {
-    address[] candidates;
-    address[] voters;
-    uint256 sponporEthers;
-    uint8 state;
-    Point[] counterPublicKeys;
-    Cipher[] ballots;
-    Point[] decryptPoints;
-    uint256 expiredBlock;
-    Point sumPublicKey;
-    Cipher sumVotes;
-    // Point decryptResultPoint;
-    uint256[] tally;
-}
-
-struct Proof {
-    uint[2] a;
-    uint[2][2] b;
-    uint[2] c;
-}
-
-struct SumProof {
-    Proof proof;
-    Point sum;
-}
-
-struct TallyProof {
-    Proof proof;
-    uint256[] tally;
-}
-
 event VoteLog(address voter);
 event SubmitPublicKeyLog(Point);
 event DecryptLog(Point);
-// event InitiateLog(uint256 indexed id);
 event ChangeStateLog(uint256 indexed id, uint8 state);
-
 event VerifierChangedLog(string name, address newAddress);
+event UpgradedLog(address newImplementation);
 
-contract Avote is IVoter, ICounter, ISponsor, Initializable, OwnableUpgradeable  {
+contract Avote is IAvote, Initializable, OwnableUpgradeable, UUPSUpgradeable  {
     uint8 private constant STATE_INITIATED = 1;
     uint8 private constant STATE_VOTING = 2;
     uint8 private constant STATE_TALLYING = 3;
-    uint8 private constant STATE_PUBLISHED = 3;
+    uint8 private constant STATE_PUBLISHED = 4;
     
     uint256 private constant WINDOW_SIZE = 32;
     uint256 private constant PUBLIC_SIGNAL_SIZE = WINDOW_SIZE * 2+ 2;
-    Point private ZERO_POINT = Point({x: 0, y: 1});
+    // Point private ZERO_POINT;
 
-    VoteVerifier voteVerifier;
-    ScalarMulGVerifier scalarMulGVerifier;
-    DecryptVerifier decryptVerifier;
-    SumVerifier sumVerifier;
-    PublicKeyVerifier publicKeyVerifier;
-    address[] validCounters;
+    VoteVerifier public voteVerifier;
+    ScalarMulGVerifier public scalarMulGVerifier;
+    DecryptVerifier public decryptVerifier;
+    SumVerifier public sumVerifier;
+    PublicKeyVerifier public publicKeyVerifier;
+    address[] public validCounters;
     mapping (uint256=>VoteInfo) voteInfos;  // mapping vote id to voteInfo
 
-    constructor(address _voteVerifier, address _publicKeyVerifier, address _decryptVerifier) initializer {
-        voteVerifier = VoteVerifier(_voteVerifier);
-        scalarMulGVerifier = ScalarMulGVerifier(_publicKeyVerifier);
-        decryptVerifier = DecryptVerifier(_decryptVerifier);
+    function getZeroPoint() public pure returns (Point memory) {
+        return Point(0, 1);
+    }
 
+    function initialize(address _voteVerifier, address _publicKeyVerifier, address _decryptVerifier, address _sumVerifier, address _scalarMulGVerifier) public initializer {
+        voteVerifier = VoteVerifier(_voteVerifier);
+        publicKeyVerifier = PublicKeyVerifier(_publicKeyVerifier);
+        decryptVerifier = DecryptVerifier(_decryptVerifier);
+        sumVerifier = SumVerifier(_sumVerifier);
+        scalarMulGVerifier = ScalarMulGVerifier(_scalarMulGVerifier);
         __Ownable_init(_msgSender());
+    }
+
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
+        require(newImplementation != address(0), "Invalid address");
+        emit UpgradedLog(newImplementation);
     }
 
     function SetSumVerifier(address verifier) public onlyOwner {
@@ -131,7 +111,7 @@ contract Avote is IVoter, ICounter, ISponsor, Initializable, OwnableUpgradeable 
             decryptPoints: new Point[](0),
             expiredBlock: block.number + initiateStateBlockNumbers,
             sumPublicKey: Point({x: 0, y: 1}),
-            sumVotes: Cipher({c1: ZERO_POINT, c2: ZERO_POINT}),
+            sumVotes: Cipher({c1: getZeroPoint(), c2: getZeroPoint()}),
             // decryptResultPoint: Point({x: 0, y: 1})
             tally: new uint256[](0)
         });
@@ -187,7 +167,7 @@ contract Avote is IVoter, ICounter, ISponsor, Initializable, OwnableUpgradeable 
         } else if (c == 1) {
             return voteInfos[id].ballots[index].c2;
         }
-        return ZERO_POINT;
+        return getZeroPoint();
     }
 
     function ChangeStateToTallying(uint256 id, SumProof[] calldata proofsC1, SumProof[] calldata proofsC2) external {
@@ -289,7 +269,15 @@ contract Avote is IVoter, ICounter, ISponsor, Initializable, OwnableUpgradeable 
         return true;
     }
 
-    function GetVoteInfo(uint256 id) view public returns(VoteInfo memory) {
+    function GetVoteInfo(uint256 id) view external returns(VoteInfo memory) {
         return voteInfos[id];
+    }
+
+    function MigrateScalarMulGCircuit(address newAddress) external onlyOwner {
+        scalarMulGVerifier = ScalarMulGVerifier(newAddress);
+    }
+
+    function MigratePublicKeyCircuit(address newAddress) external onlyOwner {
+        publicKeyVerifier = PublicKeyVerifier(newAddress);
     }
 }
