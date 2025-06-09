@@ -1,19 +1,14 @@
 # Avote
 
-### Abstract
-Avote is a decentralized anonymous voting system on the Ethereum blockchain. The voting result and the voter participation can be verified publicly, but individual ballot selections remain cryptographically concealed. Avote operates with three distinct roles.
-
-**Sponsor**
-
-Anyone can be a sponsor by depositing specified amount of ETH and specifies who has voting rights.
-
-**Voter**
-
-Voter who has voting right can submit his ballot. The ballots are cryptographically concealed so nobody knows what others submit but the ballots can be tallied by counters.
-
-**Counter**
-
-To ensure system anonymity, the system introduces a group of counters as the third party to decrypt and tally ballots. The number of counters must be at least 2. To prevent collusion among counters, both the sponsor and voters can participate as counters by staking a required amount of ETH.
+> **Abstract**
+> 
+> Avote is a decentralized anonymous voting system on the Ethereum blockchain. The voting result and the voter participation can be verified publicly, but individual ballot selections remain cryptographically concealed. Avote operates with three distinct roles.
+> 
+> **Sponsor**: Anyone can become a sponsor by depositing specified amount of ETH and defining who has voting rights.
+> 
+> **Voter**: Voters who have voting rights can submit their respective ballots. The ballots are cryptographically concealed ensuring that no one can determine others' selections, yet they can be tallied by counters.
+> 
+> **Counter**: To ensure system anonymity, a group of counters is introduced as a third party to tally ballots. The system requires at least two counters. To prevent collusion among counters, both sponsors and voters can participate as counters by staking a required amount of ETH.
 
 # Foundations of cryptography
 ### Homomorphic Encryption
@@ -74,11 +69,11 @@ We require a function $F: {\mu}\rightarrow{\xi}$ mapping plaintext ballots $m\in
 1. Bijectivity, meaning that
    
 $$
-\forall{m\in{\mu}}, \exists{M\in{\xi}}\text{, such that }M=F(m)\cap\exists{F^{-1}}\text{, where }F^{-1}(M)=m
+\forall{m\in{\mu}}, \exists{M\in{\xi}}\text{, such that }M=F(m)\wedge\exists{F^{-1}}\text{, where }F^{-1}(M)=m
 $$
       
 2. Efficient Computation. Both $M=F(m)$ and $m=F^{-1}(M)$ are computable in polynomial time.
-3. Homomorphism. $F$ should preserve the homomorphic additional property: $F(m_1)+F(m_2)=F(m_1+m_2)$
+3. Homomorphism. $F$ should preserve the additional homomorphic property: $F(m_1)+F(m_2)=F(m_1+m_2)$
 
 Koblitz encoding is commonly used since it is bijective and allows efficient computation of both $M=F(m)$ and $m=F^{-1}(M)$. Unfortunately, it loses the additional homomorphic property;
 
@@ -128,7 +123,7 @@ Finally, we must account for the fact that EC-ElGamal may be vulnerable to diffe
 See [differential attack](#differential-attack) for more details.
 
 ### Zero-knowledge proof
-Zero-knowledge proof(ZKP) is a cryptograph method that allows one party(prover) to convince another party(verifier) that a statement is true without revealing any additional information beyond the validity of the statement itself. The key properties of ZKP is:
+Zero-knowledge proof(ZKP) is a cryptographic scheme that allows one party(prover) to convince another party(verifier) that a statement is true without revealing any additional information beyond the validity of the statement itself. The key properties of ZKP is:
 
 **completeness** - If the statement is true, the verifier will be convinced by an honest prover;
 
@@ -136,48 +131,59 @@ Zero-knowledge proof(ZKP) is a cryptograph method that allows one party(prover) 
 
 **zero-knowledge** - The verifier learns nothing beyond the fact that the statement is true.
 
-There are two types of ZKP: interactive ZKP and non-interactive ZKP. The interactive ZKP requires back-and-forth communication, while the non-interactive ZKP needs only one message. Interactive ZKP is hard to be implemented on blockchain, since every message is publicly visible on blockchain. More over, the gas cost may be exceptionally high.
+ZKPs can be categorized into two types: interactive and non-interactive. Interactive ZKP requires back-and-forth communication, making it impractical for blockchain implementation due to both the public visibility of all messages and prohibitively high gas costs. In contrast, non-interactive ZKP requires only a single message.
 
 ### zk-SNARK
-zk-SNARK(Zero-Knowledge Succinct Non-Interactive Argument of Knowledge) is one kind of non-interactive ZKP. It's widely used on blockchain. For details, we recommend you read [An approximate introduction to how zk-SNARKs are possible](https://vitalik.eth.limo/general/2021/01/26/snarks.html) by Vitalik Buterin. Here we just introduce two key properties of zk-SNARK.
+zk-SNARK(Zero-Knowledge Succinct Non-Interactive Argument of Knowledge) is one prominent type of non-interactive ZKP widely adopted on blockchain system. For an in-depth understanding, we recommend you reading [An approximate introduction to how zk-SNARKs are possible](https://vitalik.eth.limo/general/2021/01/26/snarks.html) by Vitalik Buterin. Here we focus on introducing two key properties of zk-SNARKs.
 
 **Privacy preservation**
-Prover can convince the verifier the statement is true without revealing nothing beyond the statement. One example is Zcach, which is the first blockchain adopted Groth16(like zk-SNARK) for private transactions without revealing sender, receiver and amount.
+The prover can convince the verifier that a statement is true without revealing any information beyond the statement's validity. A notable example is Zcash, the first blockchain to implement Groth16(a zk-SNARK scheme) for private transactions without revealing the sender, receiver and transction amount.
 
 **verifying efficiently**
-Using zk-SNARK to verify the proof is efficient. ZK-Rollup is one of layer 2 scaling methods that it can generate the proof off-chain and verify the proof efficiently on-chain.
+In the zk-SNARK schema, the verifier can efficiently verify proofs. ZK-Rollup, a Layer 2 scaling solution, generates proofs off-chain while enabling efficient on-chain verification.
 
-Avote benefits from both of these two characteristics. When one voter submits a ballot, he needn't reveal the content of the ballot but convince the verfier in the contract that the ballot is valid. For example, the voter should not vote who is not one of the candidates, or, the voter cannot encrypt the ballot without using the specified public key $Q = \sum_{i=1}^{N_T}Q_{T_i}$ correctly. Also, in tallying phase, the counter can only submit the correct $\omega_{T_i}=d_{T_i}C_{V1}$, where the corresponding public key $Q_{T_i}$ of $d_{T_i}$ is submitted by himself at initiated phase and $C_{V1}$ is the sum calculated before tallying phase.
+Avote benefits from both aforementioned characteristics. A voter submits a ballot without revealing its value while proving the verfier contract that:
+1. The ballot is valid (e.g. not vote a non-candidates);
+2. the ballot is properly encrypted using the specified public key $Q = \sum_{i=1}^{N_T}Q_{T_i}$.
+   
+During the tallying phase, the counters can only submit the valid $\omega_{T_i}=d_{T_i}C_{V1}$ where
+1. the corresponding public key $Q_{T_i}$ of $d_{T_i}$ is pre-submitted during initiating phase;
+2. $C_{V1}$ represents the aggregated value of all $C_{V_i1}$ before tallying.
 
-Some computations on chain is difficult to implement, like calculate the sum of points on the ellipse curve. Circom helps us implement zk-SNARK circuit and generate the stub code like javascript/typescript and solidity to generate and verify a proof easily. For example, when the oracle try to trigger the state of a vote from initiated to 
+Computing the elliptic curve point sums is challenging in solidity due to the lack of native 512-bit integer support and potential overflow risks in 256-bit integer arithmetic operations. Avote's solution is:
+1. Implement circuits using Circom to generate interface code (JavaScript/TypeScript/Solidity);
+2. Generate the sum proof via JavaScript/TypeScript off-chain;
+3. Verify the proof on-chain in Solidity.
+
+The verification occurs when the oracle triggers the state from initiating to voting and from voting to tallying
 
 # State machine
 
 ```mermaid
 stateDiagram-v2
     direction LR;
-    Initiated: Initiated state phase
-    note right of Initiated
-        The counters submit their own publie key
+    Initiating: Initiating phase
+    note right of Initiating
+        The counters submit their respective publie key
     end note
 
-    Voting: Voting state phase
+    Voting: Voting phase
     note right of Voting
         The voters encrypt their ballot and submit to the contract
     end note
 
-    Tallying: Tallying state phase
+    Tallying: Tallying phase
     note right of Tallying
-        The counters decrypt the sum of ballots by their own private key and submit to the contract
+        The counters decrypt aggregated ballots‘ ciphertext with their respective private keys and submit the result to the contract
     end note
 
-    Published: Published state phase
+    Published: Published phase
     note right of Published
         The tallying result is published and finalize the state machine
     end note
 
-    [*] --> Initiated
-    Initiated --> Voting
+    [*] --> Initiating
+    Initiating --> Voting
     Voting --> Tallying
     Tallying --> Published
     Published --> [*]
@@ -192,35 +198,35 @@ sequenceDiagram
     participant Voter
     participant Oracle
     participant Contract
-    Sponsor->>Contract: Stake coins, specifies the valid voter list at this vote
+    Sponsor->>Contract: Stake coins, specifies the valid voter list in this activity
     Contract->>Contract: Initialize the vote with the unique vote id and the valid voter list
-    Counter->>Contract: Stake coins and submit their own public key to the contract
+    Counter->>Contract: Stake coins and submit their respective public keys
     Contract->>Contract: Verify the counter's proof and push the public key to the contract storage
     Oracle->>Contract: Get the public key list
-    Oracle->>Oracle: Calculate the sum of the public keys
-    Oracle->>Contract: Submit the proof to the contract
-    Contract->>Contract: Verify the oracle's proof and push the sum of public keys to the contract storage
-    Voter->>Contract: Get the sum of public key
-    Voter->>Voter: Encrypt their own ballots with the sum of public key
-    Voter->>Contract: Submit the proof to the contract
-    Contract->>Contract: Verify the voter's proof and push the ciphertext of the ballot to the contract storage
+    Oracle->>Oracle: Compute and prove the aggregated public key
+    Oracle->>Contract: Submit the proof
+    Contract->>Contract: Verify the oracle's proof and push the aggregated public key to the contract storage
+    Voter->>Contract: Get the aggregated public key
+    Voter->>Voter: Encrypt their respective ballots with the aggregated public key and generate a proof
+    Voter->>Contract: Submit the proof
+    Contract->>Contract: Verify the voter's proof and push the ballot's ciphertext to the contract storage
     Oracle->>Contract: Get the ciphertext of the ballot list
-    Oracle->>Oracle: Calculate the sum of the ciphertext
-    Oracle->>Contract: Submit the proof to the contract
-    Contract->>Contract: Verify the oracle's proof and push the sum of ciphertext to the contract storage
-    Counter->>Contract: Get the sum of ciphertext
-    Counter->>Counter: Decrypt the sum of ciphertext to a plaintext fragment with their own private key
-    Counter->>Contract: Submit the proof to the contract
+    Oracle->>Oracle: Compute and prove the aggregated ciphertext
+    Oracle->>Contract: Submit the proof
+    Contract->>Contract: Verify the oracle's proof and push the aggregated ciphertext to the contract storage
+    Counter->>Contract: Get the aggregated ciphertext
+    Counter->>Counter: Decrypt the aggregated ciphertext to a plaintext fragment with their respective private keys
+    Counter->>Contract: Submit the proof
     Contract->>Contract: Verify the counter's proof and push the plaintext fragment to the contract storage
-    Oracle->>Contract: Get the plaintext fragments of the ballot list
-    Oracle->>Oracle: Calculate the tallying result of the vote
-    Oracle->>Contract: Submit the proof to the contract
+    Oracle->>Contract: Get the plaintext fragments list
+    Oracle->>Oracle: Compute the tallying result of the activity
+    Oracle->>Contract: Submit the proof
     Contract->>Contract: Verify the oracle's proof and push the tallying result to the contract storage
 ```
 
 # Attacks
 ### Differential attack
-EC-Elgamal may be at risk of differential attack if the same random value $k$ is used more than once to encrypt different plaintext $m$. If we get two different ciphertext, that
+EC-ElGamal may be vulnerable to differential attacks if the same random value $k$ is reused to encrypt different plaintexts $m$. If we get two different ciphertexts, which are
 
 $$
 \begin{cases}
@@ -244,33 +250,46 @@ $$
   C_{2}{'} - C_{2} = M' - M
 $$
 
-Since $C_{2}'$ and $C_2$ is publicly known, It will reveal the difference between $M$ and $M'$, as well as the difference between $m$ and $m'$. Since $m$ and $m'$ are both small, the attacker can calculate it using brute-force search. Even more, if the attacker knows one value of $m$ and $m'$, he can calculate the other one easily.
+Since $C_{2}'$ and $C_2$ are publicly known, they reveal the difference between $M$ and $M'$, as well as the difference between $m$ and $m'$. Since $m$ and $m'$ are both small values, an attacker can compute $m'-m$ via brute-force search. Moreover, if the attacker knows either $m$ or $m'$, they can deduce the other easily.
 
-Also, if k is too small, the attacker can use brute-force search to calculate k according to equation (13) and use $k$ to calculate M attacording to equation (14).
+Additionally, if $k$ is too small, an attacker can brute-force $k$ using Eequation (13) and then subsequently recover $M$ according to equation (14).
 
-So, the voter generate random k that satified:
-1. the voter's client should never cache the value of $k$ and destroy it when $k$ is used to encrypt a plaintext.
-2. k must be large enough;
-<!-- 3. k must not be too large, also. Since it may be vulnerable to overflow attack. We'll talk about it next chapter. -->
+Therefore, the random $k$ should be generated satisfying:
+1. $k$ must never be disclosed to other systems or parties;
+2. $k$ must be not be cached in the generator's client and must be erased immediately after ciphertext generation.
+3. $k$ must be sampled from a sufficient large space;
 
 ### Overflow attack
-As we know, the solidity programmers must pay special attention to overflow attack, especially addition operation and multiplication operation between two big integers. Similarly, Circom programmers should guard against overflow attacks since arithmetic operations are performed in a finite field (modular arithmetic). Poor logical design may lead to security issues analogous to overflow attacks. We suggest using Num2Bits or LessThan in circomlib to explicitly restrict the bit length of inputs and evaluate the contraint logic whether it's at risk of overflow-like vulnerabilities.
+As we know, the solidity developers must pay special attention to overflow attack, particularly in arithmetic operations between two big integers. Similarly, Circom developers should guard against overflow-like risks since arithmetic operations are performed in a finite field (modular arithmetic). Poor logical design may lead to security issues analogous to overflow attacks. We recommend using Num2Bits or LessThan in circomlib to explicitly restrict the bit length of inputs and carefully auditing the constraint logic to ensure it's not vulnerable to overflow attacks.
 
 ### Double spending attack
-At the current version, the contract stores the list of the voters' address. It's easy to prevent double spending attack, since the contract can verify if the voter has submitted a ballot before by searching the voter's address in the voted address list.
+In the current implementation, the contract stores a list of voter addresses provided by the sponsor for simplicity, ensuring easy verification of voting rights and preventing double-spending attacks.
 
-But there's a flaw that all of the parties especially the sponsor knows who has submit a ballot or not. Some result may be easy to infer that the ballot is voted by which voter, for example, there's only one voter submit his ballot. In future version, the sponsor may initiate the vote by submitted the voters' public key merkle tree instead of the voters' addresses. In voting phase, the voter should prove that he knowns the private key which corrensponding public key is the leaf of the merkle tree and submit the hash of private key, the ciphertext and the proof. The contract will additionally stores the hash of private key in the used merkle tree for preventing double spending attack.
+However, this approach has a privacy flaw: any party, especially the sponsor can track which voters have submitted the ballots. In some cases, voting behavior may be easily inferred, for example, if only one voter has cast a ballot. Additionally, address-based storage is incompatible with cross-chain verification, as external chains cannot validate the whitelist.
+
+To address these, a future version will replace the direct storage of voter addresses with a Merkle tree of the voters' public keys. During voting phase, the voters must:  
+1. Compute the hash of the private key;
+2. Compute the encrypted ballot with their private keys;
+3. Prove:
+   - The hashed private key is valid;
+   - The encrypt ballot is valid;
+   - the public key corresponding to the private key is in the Merkle tree.
+4. Submit the hashed private key, encrypted ballot and the proof to the contract.
+
+The contract will additionally store the hashed private key to prevent double-spending while preserving voter anonymity.
 
 ### Collusion attack
-If all counter collude, they can decrypt all the ballots, thus all the privacy of the voter are revealed. Avote encourages the voter stakes tokens to be a counter if he is warried about collusion. Thus, in tallying phase, all cannot decrypt the source ballots without the voter's plaintext fragment.
+If all counters collude, they could decrypt all the ballots, compromising the voter privacy. To mitigate this risk, Avote encourages the voters stake tokens and participate as counters if they are concerned about collusion. As a result, during tallying phase, nobody can decrypt the original ballots without these voters' plaintext fragment.
 
-### Lazy decrypted attack
-If some counters didn't submit his plaintext fragment in time, all of the parties cannot get the tally result. At the current version, Avote will slash the tokens staked by the counter who is lazy tallying, and all of the other parties can unstake their own token.
-In future, maybe Avote will add another phase, called second-tallying phase. When the tallying phase failed to collect all the plaintext fragments, second-tallying phase will be activated. The second-tallying phase use threshold decryption.
-At initiated phase, each counter should submit two public keys, one for tallying phase and the other for second-tallying phase. At voting phase, each voter should submit two ciphertexts using these two public keys respectively. When tallying phase times out and the contract does not collect all the plaintext fragments, the tokens which staked by the lazy counters will be slashed and the second-tallying phase is activated.
+### Lazy tallying attack
+If any counter fails to submit his plaintext fragment on time, all parties cannot obtain the tally result. In the current implementation, Avote will slashes the staked tokens of these non-compliant counters, and all of the other parties can withdraw their respective staked tokens.
 
-### Fake vote attack
-Both voter and counter may be malicious. The voter may submit a encrypted ballot voting a unexisted candidate, e.g. there's 3 candidates, but the voter votes the 5th candidate. The counter may submit a fake plaintext fragment without using his correct private key. ZKP is important to prevent these attacks. When the voter submit his ballot, he should generate a proof to convice that he's ballot $b$ is satisfied $1\leq{b}\leq{N_C}$, and he encrypts data with the sepecified public key collectly. And in tallying phase, the counter should prove that he has the private key corresponding to the public key submitted in initiated phase and the plaintext fragment is decrypted with this private key correctly.
+Maybe Avote will introduce a new "second-tallying phase" in the future versions. During initiating phase, each counter must submit two public keys, one for tallying phase and the other for second-tallying phase. During the voting phase, each voter must submit two ciphertexts using these two public keys respectively. If the contract fails to collect all the plaintext fragments during the talling phase, all tokens staked by the non-compliant counters will be slashed and the second-tallying phase will be activated, enabling threshold decryption to recover the tally result. 
+
+### Fake submitting attack
+Both voter and counter may be malicious, for example, voters may submit a encrypted ballot for a nonexisted candidate and counters may submit a fake plaintext fragment without correctly using their private keys. zero-knowledge proof is a crucial technology to prevent such attacks. 
+
+When the voters submit their ballots, they must prove that their respective ballots $b_{V_i}$ satisfies $1\leq{b_{V_i}}\leq{N_C}$, and the data is encrypted with their sepecified public keys collectly. During the tallying phase, the counters must prove that they have the private key corresponding to the public key submitted during the initiating phase and the plaintext fragment is decrypted with this private key correctly.
 
 # More details
 [Exploring Elliptic Curve Pairings](https://medium.com/@VitalikButerin/exploring-elliptic-curve-pairings-c73c1864e627) --Vitalik Buterin
