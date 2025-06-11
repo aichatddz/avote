@@ -1,12 +1,11 @@
 import "@nomicfoundation/hardhat-toolbox-viem/network-helpers";
 import hre from "hardhat";
 import { sepolia } from 'viem/chains'
-import {createPublicClient, createWalletClient, http} from "viem"
+import { createWalletClient, http} from "viem"
 import { privateKeyToAccount } from "viem/accounts";
 import { configDotenv } from "dotenv"
 import { resolve } from "path";
-import Conf from "./config";
-import { AvoteProxy } from "../deployments/contracts";
+import { AvoteProxy, ScalarMulGVerifierCircuit } from "../deployments/contracts";
 
 async function main() {
     configDotenv({ path: resolve(__dirname, "./.env") })    
@@ -31,7 +30,7 @@ async function main() {
     const avote = await hre.viem.getContractAt("Avote", AvoteProxy, {
         client: {wallet: walletClient}
     })
-    await avote.write.MigrateScalarMulGCircuit(["0x1c393a10866b9363062fef35792ae29cd1557221"]);
+    await avote.write.MigrateScalarMulGCircuit([ScalarMulGVerifierCircuit]);
     
 }
 
