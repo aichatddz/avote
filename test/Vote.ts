@@ -47,7 +47,7 @@ describe("Verifier", function () {
       })
       const rsp = await cli.write.SubmitPublicKey([fixture.voteId, ...proof]);
       await fixture.publicClient.waitForTransactionReceipt({hash: rsp});
-      const voteEvents = await cli.getEvents.SubmitPublicKeyLog();
+      const voteEvents = await cli.getEvents.Action();
       expect(voteEvents).to.have.lengthOf(1);
     }
     expect(await fixture.avote.read.GetVoteInfo([fixture.voteId])).to.be.deep.equals(fixtureTest.InitiatedStateEnd());
@@ -91,9 +91,8 @@ describe("Verifier", function () {
       })
       const rsp = await cli.write.Vote([fixture.voteId, ...proof]);
       await fixture.publicClient.waitForTransactionReceipt({hash: rsp});
-      const voteEvents = await fixture.avote.getEvents.VoteLog();
+      const voteEvents = await fixture.avote.getEvents.Action();
       expect(voteEvents).to.have.lengthOf(1);
-      expect(voteEvents[0].args.voter?.toLocaleLowerCase()).to.deep.equals(wallet.account.address);
     }
     expect(await fixture.avote.read.GetVoteInfo([fixture.voteId])).to.be.deep.equals(fixtureTest.VotingStateEnd());
   })
@@ -148,7 +147,7 @@ describe("Verifier", function () {
       });
       const rsp = await fixture.avote.write.Decrypt([fixture.voteId, ...proof]);
       await fixture.publicClient.waitForTransactionReceipt({hash: rsp});
-      const decryptEvents = await fixture.avote.getEvents.DecryptLog();
+      const decryptEvents = await fixture.avote.getEvents.Action();
       expect(decryptEvents).to.have.lengthOf(1);
     }
     expect(await fixture.avote.read.GetVoteInfo([fixture.voteId])).to.deep.equals(fixtureTest.TallyingStateEnd());

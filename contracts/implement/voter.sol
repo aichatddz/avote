@@ -13,9 +13,11 @@ import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Own
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 
+event Action(string name, uint256 id);
+
 event VoteLog(address voter);
-event SubmitPublicKeyLog(Point);
-event DecryptLog(Point);
+// event SubmitPublicKeyLog(Point);
+// event DecryptLog(Point);
 event ChangeStateLog(uint256 indexed id, uint8 state);
 event VerifierChangedLog(string name, address newAddress);
 event UpgradedLog(address newImplementation);
@@ -71,7 +73,8 @@ contract Avote is IAvote, Initializable, OwnableUpgradeable, UUPSUpgradeable  {
             c2: Point(_pubSignals[4], _pubSignals[5])
         });
         voteInfos[id].ballots.push(vote);
-        emit VoteLog(msg.sender);
+        // emit VoteLog(msg.sender);
+        emit Action("vote", id);
     }
 
     function SubmitPublicKey(uint256 id, uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[2] calldata _pubSignals) external payable {
@@ -84,7 +87,8 @@ contract Avote is IAvote, Initializable, OwnableUpgradeable, UUPSUpgradeable  {
             y: _pubSignals[1]
         });
         voteInfos[id].counterPublicKeys.push(publicKey);
-        emit SubmitPublicKeyLog(publicKey);
+        // emit SubmitPublicKeyLog(publicKey);
+        emit Action("submit_public_key", id);
     }
 
     function Decrypt(uint256 id, uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[6] calldata _pubSignals) external {
@@ -95,7 +99,8 @@ contract Avote is IAvote, Initializable, OwnableUpgradeable, UUPSUpgradeable  {
             y: _pubSignals[5]
         });
         voteInfos[id].decryptPoints.push(decrypt);
-        emit DecryptLog(decrypt);
+        // emit DecryptLog(decrypt);
+        emit Action("decrypt", id);
     }
 
     function Initiate(address[] calldata candidates, address[] calldata voters, uint256 id, uint256 initiateStateBlockNumbers) external payable {

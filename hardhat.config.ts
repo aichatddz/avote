@@ -17,6 +17,8 @@ if (!SEPOLIA_ALCHEMY_AK) {
   throw new Error("Please set your SEPOLIA_ALCHEMY_AK in a .env file")
 }
 
+const SEPOLIA_ETHERSCAN_API_KEY = process.env.SEPOLIA_ETHERSCAN_API_KEY
+
 const config: HardhatUserConfig = {
   solidity: {
     version: "0.8.28",
@@ -29,11 +31,16 @@ const config: HardhatUserConfig = {
     },
   },
   networks: {
-      sepolia: {
-        url: `https://eth-sepolia.g.alchemy.com/v2/${SEPOLIA_ALCHEMY_AK}`,
-        accounts: [`${SEPOLIA_PK_ONE}`],
-      },
+    sepolia: {
+      url: `https://eth-sepolia.g.alchemy.com/v2/${SEPOLIA_ALCHEMY_AK}`,
+      accounts: [`${SEPOLIA_PK_ONE}`],
+    },
   },
+  etherscan: {
+    apiKey: {
+      sepolia: SEPOLIA_ETHERSCAN_API_KEY as string,
+    }
+  }
 };
 
 export default config;
