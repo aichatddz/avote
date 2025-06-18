@@ -52,6 +52,7 @@ async function main() {
 
 main().then(()=>{
     console.log("submit_public_key succeeded");
+    process.exit(0);
 }).catch((error) => {
     console.error(error);
     process.exit(1);

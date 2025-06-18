@@ -43,7 +43,7 @@ struct VoteInfo {
 
 interface IAvote {
     function initialize(address _voteVerifier, address _publicKeyVerifier, address _decryptVerifier, address _sumVerifier, address _scalarMulGVerifier) external;
-    function Vote(uint256 id, uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[6] calldata _pubSignals) external;
+    function Vote(uint256 id, Proof calldata proof, Cipher calldata cipher) external;
     function SubmitPublicKey(uint256 id, uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[2] calldata _pubSignals) external payable;
     function Decrypt(uint256 id, uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[6] calldata _pubSignals) external;
     function ChangeStateToVoting(uint256 id, SumProof[] calldata sumProofs) external;

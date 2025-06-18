@@ -63,14 +63,21 @@ contract Avote is IAvote, Initializable, OwnableUpgradeable, UUPSUpgradeable  {
         emit VerifierChangedLog("sum", verifier);
     }
 
-    function Vote(uint256 id, uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[6] calldata _pubSignals) external {
+    function Vote(uint256 id, Proof calldata proof, Cipher calldata cipher) external {
         require(voteInfos[id].state == STATE_VOTING, "state is not voting");
         require(hasVoteRight(id, msg.sender), "no voter right");
-        bool isVerified = voteVerifier.verifyProof(_pA, _pB, _pC, _pubSignals);
+        uint[6] memory pubSignals;
+        pubSignals[0] = voteInfos[id].sumPublicKey.x;
+        pubSignals[1] = voteInfos[id].sumPublicKey.y;
+        pubSignals[2] = cipher.c1.x;
+        pubSignals[3] = cipher.c1.y;
+        pubSignals[4] = cipher.c2.x;
+        pubSignals[5] = cipher.c2.y;
+        bool isVerified = voteVerifier.verifyProof(proof.a, proof.b, proof.c, pubSignals);
         require(isVerified, "verify proof failed");
         Cipher memory vote = Cipher({
-            c1: Point(_pubSignals[2], _pubSignals[3]),
-            c2: Point(_pubSignals[4], _pubSignals[5])
+            c1: cipher.c1,
+            c2: cipher.c2
         });
         voteInfos[id].ballots.push(vote);
         // emit VoteLog(msg.sender);

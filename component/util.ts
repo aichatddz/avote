@@ -12,6 +12,11 @@ export interface Proof {
     c: [bigint, bigint];
 }
 
+export interface VoteProof {
+    proof: Proof;
+    cipher: BigCipher;
+}
+
 export interface SumProof {
     proof: Proof;
     sum: BigPoint;
@@ -34,6 +39,10 @@ export function toPoint(curve: BabyJub, b: BigPoint): Point {
         curve.F.e(b.x),
         curve.F.e(b.y),
     ]
+}
+
+export function mulBigPointEscalar(curve: BabyJub, point: BigPoint, scalar: bigint): BigPoint {
+    return toBigPoint(curve, curve.mulPointEscalar(toPoint(curve, point), scalar));
 }
   
 export interface Cipher {
