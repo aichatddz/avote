@@ -4,6 +4,7 @@ import hre from "hardhat";
 import * as Util from "../component/util"
 import * as Prover from "../component/prover"
 import * as fixtureTest from "./fixture"
+import { buildBabyjub } from "circomlibjs";
 
 describe("Verifier", function () {
   it("Should initiate a vote successfully", async function () {
@@ -74,22 +75,23 @@ describe("Verifier", function () {
   })
 
   it("Should submit the right votes", async () => {
+    const curve = await buildBabyjub();
     const fixture = await loadFixture(fixtureTest.deployFixture);
     const state = fixtureTest.VotingStateStart();
     await fixture.avote.write.SetTestState([fixture.voteId, state]);
     for (let i = 0; i < fixture.voterPrivates.length; i++) {
-      let prover = new Prover.Voter(fixture.voterPrivates[i].randomK);
-      const proof = await prover.prove({
+      const proof = await Prover.GenerateVoteProof(curve, {
         publicKey: fixtureTest.VotingStateStart().sumPublicKey,
         value: fixture.voterPrivates[i].value,
         voterNum: BigInt(state.voters.length),
         candidateNum: BigInt(state.candidates.length),
+        randomK: fixture.voterPrivates[i].randomK,
       });
       let wallet = fixture.accounts[i+10];
       let cli = await hre.viem.getContractAt("Avote", fixture.avote.address, {
         client: { wallet: wallet},
       })
-      const rsp = await cli.write.Vote([fixture.voteId, ...proof]);
+      const rsp = await cli.write.Vote([fixture.voteId, proof.proof, proof.cipher]);
       await fixture.publicClient.waitForTransactionReceipt({hash: rsp});
       const voteEvents = await fixture.avote.getEvents.Action();
       expect(voteEvents).to.have.lengthOf(1);

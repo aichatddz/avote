@@ -6,12 +6,19 @@ interface BaseCreateSignalParam {
 
 }
 
-interface CreateVoteSignalsParam {
+interface CreateVoteProofInput {
     publicKey: Util.BigPoint;
     value: bigint;       // 1 <= v <= candidateNum
     randomK: bigint;
     voterNum: bigint;
     candidateNum: bigint;
+}
+
+interface CreateVoteSignalsParam {
+    publicKey: Util.BigPoint;
+    randomK: bigint;
+    cipher: Util.BigCipher;
+    m: Util.BigPoint;
 }
 
 interface CreatePublicKeySignalsParam {
@@ -87,30 +94,16 @@ export class PublicKey extends Prover<2> {
 
 
 export class Voter extends Prover<6> {
-    private randomK: bigint;
-    public constructor(randomK: bigint) {
+    public constructor() {
         super("./circom/compile/vote_js/vote.wasm", "./circom/vote_0001.zkey", 6);
-        this.randomK = randomK;
     }
-    private mapBallotToValue(v: bigint, voterNum: bigint, candidateNum: bigint): bigint {
-        // console.log("(voterNum+1n) ** (candidateNum - v): ", (voterNum+1n) ** (candidateNum - v))
-        return (voterNum+1n) ** (candidateNum - v);
-    }
-    
     async createSignals(params: CreateVoteSignalsParam): Promise<snarkjs.CircuitSignals> {
-        const curve = await buildBabyjub();
-        // m is the mapped point in the curve of value value
-        const m: Point = curve.mulPointEscalar(curve.Base8,
-            this.mapBallotToValue(params.value, params.voterNum, params.candidateNum));
-        const k: bigint = this.randomK; // random big number
-        const c1: Point = curve.mulPointEscalar(curve.Base8, k);
-        const c2: Point = curve.addPoint(m, curve.mulPointEscalar(Util.toPoint(curve, params.publicKey), k));
         return {
-            randomK: k,
-            publicKey: [ curve.F.toString(Util.toPoint(curve, params.publicKey)[0]), curve.F.toString(Util.toPoint(curve, params.publicKey)[1]) ],
-            c1: [ curve.F.toString(c1[0]), curve.F.toString(c1[1]) ],
-            c2: [curve.F.toString(c2[0]), curve.F.toString(c2[1]) ],
-            m: [ curve.F.toString(m[0]), curve.F.toString(m[1]) ],
+            randomK: params.randomK,
+            publicKey: [ params.publicKey.x, params.publicKey.y ],
+            c1: [ params.cipher.c1.x, params.cipher.c1.y ],
+            c2: [ params.cipher.c2.x, params.cipher.c2.y ],
+            m: [ params.m.x, params.m.y ],
         };    
     }
 }
@@ -229,4 +222,42 @@ export async function GenerateCheckSumProof(curve: BabyJub, points: readonly Uti
         lastSum = Util.toBigPoint(curve, sumPoint);
     }
     return proofs;
+}
+
+function mapBallotToValue(v: bigint, voterNum: bigint, candidateNum: bigint): bigint {
+    // console.log("(voterNum+1n) ** (candidateNum - v): ", (voterNum+1n) ** (candidateNum - v))
+    return (voterNum+1n) ** (candidateNum - v);
+}
+
+export async function GenerateVoteProof(curve: BabyJub, params: CreateVoteProofInput): Promise<Util.VoteProof> {
+    let prover = new Voter();
+
+    let randomK = params.randomK;
+    if (randomK == 0n) {
+        randomK = Util.randomScalar(curve);
+    }
+
+    const m: Util.BigPoint = Util.toBigPoint(curve, curve.mulPointEscalar(curve.Base8,
+        mapBallotToValue(params.value, params.voterNum, params.candidateNum)));
+    const c1: Util.BigPoint = Util.toBigPoint(curve, curve.mulPointEscalar(curve.Base8, randomK));
+    const c2: Util.BigPoint = Util.sumBigPoints(curve, [m, Util.mulBigPointEscalar(curve, params.publicKey, randomK)]);
+
+    const proof = await prover.prove({
+        publicKey: params.publicKey,
+        randomK: randomK,
+        cipher: { c1: c1, c2: c2},
+        m: m,       
+    });
+
+    return {
+        proof: {
+            a: proof[0],
+            b: proof[1],
+            c: proof[2],
+        },
+        cipher: {
+            c1: c1,
+            c2: c2
+        }
+    }
 }

@@ -6,14 +6,14 @@ import { privateKeyToAccount } from "viem/accounts";
 import { configDotenv } from "dotenv"
 import { resolve } from "path";
 import { AvoteProxy } from "../deployments/contracts";
-import { Voter } from "../component/prover";
+import { GenerateVoteProof } from "../component/prover";
 import { ActivityID } from "./const";
 import { randomScalar } from "../component/util";
 import { buildBabyjub } from "circomlibjs";
 
 const params = {
-    voter_wallet_private: process.env.SEPOLIA_PK_VOTER6,
-    value: 1n,
+    voter_wallet_private: process.env.SEPOLIA_PK_VOTER5,
+    value: 3n,
 }
 
 async function main() {
@@ -42,18 +42,18 @@ async function main() {
     let voteInfo = await contract.read.GetVoteInfo([ActivityID]);
 
     const curve = await buildBabyjub();
-    let prover = new Voter(randomScalar(curve));
-    const proof = await prover.prove({
+    const proof = await GenerateVoteProof(curve, {
         publicKey: voteInfo.sumPublicKey,
         value: params.value,
         voterNum: BigInt(voteInfo.voters.length),
         candidateNum: BigInt(voteInfo.candidates.length),
+        randomK: randomScalar(curve),
     });
 
     const avote = await hre.viem.getContractAt("Avote", AvoteProxy, {
         client: {wallet: walletClient}
     })
-    const rsp = await avote.write.Vote([ActivityID, ...proof]);
+    const rsp = await avote.write.Vote([ActivityID, proof.proof, proof.cipher]);
     console.log("rsp: ", rsp)
 }
 

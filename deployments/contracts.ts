@@ -5,4 +5,4 @@ export const CheckSumVerifierCircuit: `0x${string}` = "0x536f9355e582a6612661cc2
 export const ScalarMulGVerifierCircuit: `0x${string}` = "0x9583714a286712be0079064f60a3444d55315e7a";
 
 export const AvoteProxy: `0x${string}` = "0x22005FB9391EA5bD6e57dBc5674365C9913D1a8b";
-export const AvoteImplement: `0x${string}` = "0xfd2257fa43e11287bbf142777b427bc234c55773";
+export const AvoteImplement: `0x${string}` = "0x2bC96ae8442362507A0f513f54cBF93601C10a60";
