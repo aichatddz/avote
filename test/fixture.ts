@@ -1,6 +1,7 @@
 import * as Util from "../component/util";
 import hre from "hardhat";
 import * as CircomLib from "circomlibjs";
+import { bigint } from "hardhat/internal/core/params/argumentTypes";
 
 // PublicKeyCircuit: 0x5bb54c5c11966492106ea1b8dce691f58b5f3fa9
 // DecryptCircuit: 0xa6b401198ff094111692edbfbb7c958854a387a3
@@ -21,7 +22,8 @@ interface CounterTestValue {
   dMulC1: Util.BigPoint;
 }
 
-interface TestState {
+// deprecated
+interface VoteInfo {
     candidates: readonly `0x${string}`[];
     voters: readonly `0x${string}`[];
     sponporEthers: bigint;
@@ -32,9 +34,40 @@ interface TestState {
     expiredBlock: bigint;
     sumPublicKey: Util.BigPoint;
     sumVotes: Util.BigCipher;
-    // decryptResultPoint: Util.BigPoint;
     tally: bigint[];
 }
+
+interface Voter {
+    addr: `0x${string}`;
+    state: number;
+    ballot: Util.BigCipher;
+    reversed: [bigint, bigint, bigint, bigint, bigint, bigint, bigint, bigint];
+}
+
+interface Counter {
+    addr: `0x${string}`;
+    publicKey: Util.BigPoint;
+    state: number;
+    decryption: Util.BigPoint;
+    reversed: [bigint, bigint, bigint, bigint, bigint, bigint, bigint, bigint];
+}
+
+interface AcvivityInfo {
+    expiredBlock: bigint;
+    sponporStateAmount: bigint;
+    counterStateAmount: bigint;
+    state: number;
+    sumPublicKey: Util.BigPoint;
+    sumVotes: Util.BigCipher;
+    candidates: readonly `0x${string}`[];
+    voters: Voter[];
+    counters: Counter[];
+    tally: bigint[];
+    reversed: [bigint, bigint, bigint, bigint, bigint, bigint, bigint, bigint, bigint, bigint, bigint, bigint, bigint, bigint, bigint, bigint];
+}
+
+const defaultReversed: [bigint, bigint, bigint, bigint, bigint, bigint, bigint, bigint, bigint, bigint, bigint, bigint, bigint, bigint, bigint, bigint] = [0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n];
+const defaultReversedUint8: [bigint, bigint, bigint, bigint, bigint, bigint, bigint, bigint] = [0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n];
 
 var testCandidates: readonly `0x${string}`[] = [
   '0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc',
@@ -50,6 +83,13 @@ var testVoters: readonly `0x${string}`[] = [
   "0xFABB0ac9d68B0B445fB7357272Ff202C5651694a",
   "0x1CBd3b2770909D4e10f157cABC84C7264073C9Ec",
   "0xdF3e18d64BC6A983f673Ab319CCaE4f1a57C7097"
+]
+
+var testCounterAddresses: `0x${string}`[] = [
+    "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+    "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+    "0x90F79bf6EB2c4f870365E785982E1f101E93b906",
+
 ]
 
 var testCounterPublicKeys: readonly Util.BigPoint[] = [{
@@ -146,125 +186,311 @@ var testDecryptPoints: Util.BigPoint[] = [{
 
 const zeroPoint: Util.BigPoint = {x: 0n, y: 1n};
 
-export function InitiatedStateStart(): TestState {
+const COUNTER_STATE_NONE: number = 0;
+const COUNTER_STATE_PUBLIC_KEY_SUBMITTED: number = 1;
+const COUNTER_STATE_DECRYPTION_SUBMITTED: number = 2;
+
+const VOTER_STATE_NONE: number = 0;
+const VOTER_STATE_INIT: number = 1;
+const VOTER_STATE_ENCRYPTION_SUBMITTED: number = 2;
+
+export function InitiatedStateStart(): AcvivityInfo {
+  const voters: Voter[] = [
+    { addr: testVoters[0], ballot: {c1: zeroPoint, c2: zeroPoint}, state: VOTER_STATE_INIT, reversed: defaultReversedUint8 },
+    { addr: testVoters[1], ballot: {c1: zeroPoint, c2: zeroPoint}, state: VOTER_STATE_INIT, reversed: defaultReversedUint8 },
+    { addr: testVoters[2], ballot: {c1: zeroPoint, c2: zeroPoint}, state: VOTER_STATE_INIT, reversed: defaultReversedUint8 },
+    { addr: testVoters[3], ballot: {c1: zeroPoint, c2: zeroPoint}, state: VOTER_STATE_INIT, reversed: defaultReversedUint8 },
+    { addr: testVoters[4], ballot: {c1: zeroPoint, c2: zeroPoint}, state: VOTER_STATE_INIT, reversed: defaultReversedUint8 },
+  ]
+  const counters: Counter[] = []
   return {
-      candidates: testCandidates,
-      voters: testVoters,
-      sponporEthers: 1n,
-      state: 1,
-      counterPublicKeys: [],
-      ballots: [],
-      decryptPoints: [],
-      expiredBlock: 11n,
-      sumPublicKey: zeroPoint,
-      sumVotes: {c1: zeroPoint, c2: zeroPoint},
-      // decryptResultPoint: zeroPoint,
-      tally: [],
+    expiredBlock: 11n,
+    sponporStateAmount: 1n,
+    counterStateAmount: 0n,
+    state: 1,
+    sumPublicKey: zeroPoint,
+    sumVotes: {c1: zeroPoint, c2: zeroPoint},
+    candidates: testCandidates,
+    voters: voters,
+    counters: counters,
+    tally: [],
+    reversed: defaultReversed,
   };
 }
 
-export function InitiatedStateEnd(): TestState {
+export function InitiatedStateEnd(): AcvivityInfo {
+  const voters: Voter[] = [
+    { addr: testVoters[0], ballot: {c1: zeroPoint, c2: zeroPoint}, state: VOTER_STATE_INIT, reversed: defaultReversedUint8 },
+    { addr: testVoters[1], ballot: {c1: zeroPoint, c2: zeroPoint}, state: VOTER_STATE_INIT, reversed: defaultReversedUint8 },
+    { addr: testVoters[2], ballot: {c1: zeroPoint, c2: zeroPoint}, state: VOTER_STATE_INIT, reversed: defaultReversedUint8 },
+    { addr: testVoters[3], ballot: {c1: zeroPoint, c2: zeroPoint}, state: VOTER_STATE_INIT, reversed: defaultReversedUint8 },
+    { addr: testVoters[4], ballot: {c1: zeroPoint, c2: zeroPoint}, state: VOTER_STATE_INIT, reversed: defaultReversedUint8 },
+  ]
+  const counters: Counter[] = [
+    {
+      addr: testCounterAddresses[0],
+      publicKey: testCounterPublicKeys[0],
+      state: COUNTER_STATE_PUBLIC_KEY_SUBMITTED,
+      decryption: zeroPoint,
+      reversed: defaultReversedUint8,
+    },
+    {
+      addr:testCounterAddresses[1],
+      publicKey: testCounterPublicKeys[1],
+      state: COUNTER_STATE_PUBLIC_KEY_SUBMITTED,
+      decryption: zeroPoint,
+      reversed: defaultReversedUint8,
+    },
+    {
+      addr: testCounterAddresses[2],
+      publicKey: testCounterPublicKeys[2],
+      state: COUNTER_STATE_PUBLIC_KEY_SUBMITTED,
+      decryption: zeroPoint,
+      reversed: defaultReversedUint8,
+    },
+  ]
   return {
-      candidates: testCandidates,
-      voters: testVoters,
-      sponporEthers: 1n,
-      state: 1,
-      counterPublicKeys: testCounterPublicKeys,
-      ballots: [],
-      decryptPoints: [],
-      expiredBlock: 11n,
-      sumPublicKey: zeroPoint,
-      sumVotes: {c1: zeroPoint, c2: zeroPoint},
-      // decryptResultPoint: zeroPoint,
-      tally: [],
+    expiredBlock: 11n,
+    sponporStateAmount: 1n,
+    counterStateAmount: 0n,
+    state: 1,
+    sumPublicKey: zeroPoint,
+    sumVotes: {c1: zeroPoint, c2: zeroPoint},
+    candidates: testCandidates,
+    voters: voters,
+    counters: counters,
+    tally: [],
+    reversed: defaultReversed,
   };
 }
 
-export function VotingStateStart(): TestState {
+export function VotingStateStart(): AcvivityInfo {
+  const voters: Voter[] = [
+    { addr: testVoters[0], ballot: {c1: zeroPoint, c2: zeroPoint}, state: VOTER_STATE_INIT, reversed: defaultReversedUint8 },
+    { addr: testVoters[1], ballot: {c1: zeroPoint, c2: zeroPoint}, state: VOTER_STATE_INIT, reversed: defaultReversedUint8 },
+    { addr: testVoters[2], ballot: {c1: zeroPoint, c2: zeroPoint}, state: VOTER_STATE_INIT, reversed: defaultReversedUint8 },
+    { addr: testVoters[3], ballot: {c1: zeroPoint, c2: zeroPoint}, state: VOTER_STATE_INIT, reversed: defaultReversedUint8 },
+    { addr: testVoters[4], ballot: {c1: zeroPoint, c2: zeroPoint}, state: VOTER_STATE_INIT, reversed: defaultReversedUint8 },
+  ]
+  const counters: Counter[] = [
+    {
+      addr: testCounterAddresses[0],
+      publicKey: testCounterPublicKeys[0],
+      state: COUNTER_STATE_PUBLIC_KEY_SUBMITTED,
+      decryption: zeroPoint,
+      reversed: defaultReversedUint8,
+    },
+    {
+      addr:testCounterAddresses[1],
+      publicKey: testCounterPublicKeys[1],
+      state: COUNTER_STATE_PUBLIC_KEY_SUBMITTED,
+      decryption: zeroPoint,
+      reversed: defaultReversedUint8,
+    },
+    {
+      addr: testCounterAddresses[2],
+      publicKey: testCounterPublicKeys[2],
+      state: COUNTER_STATE_PUBLIC_KEY_SUBMITTED,
+      decryption: zeroPoint,
+      reversed: defaultReversedUint8,
+    },
+  ]
   return {
-      candidates: testCandidates,
-      voters: testVoters,
-      sponporEthers: 1n,
-      state: 2,
-      counterPublicKeys: testCounterPublicKeys,
-      ballots: [],
-      decryptPoints: [],
-      expiredBlock: 11n,
-      sumPublicKey: testSumPublicKeys,
-      sumVotes: {c1: zeroPoint, c2: zeroPoint},
-      // decryptResultPoint: zeroPoint,
-      tally: [],
+    expiredBlock: 11n,
+    sponporStateAmount: 1n,
+    counterStateAmount: 0n,
+    state: 2,
+    sumPublicKey: testSumPublicKeys,
+    sumVotes: {c1: zeroPoint, c2: zeroPoint},
+    candidates: testCandidates,
+    voters: voters,
+    counters: counters,
+    tally: [],
+    reversed: defaultReversed,
   };
 }
 
-export function VotingStateEnd(): TestState {
+export function VotingStateEnd(): AcvivityInfo {
+  const voters: Voter[] = [
+    { addr: testVoters[0], ballot: testBallots[0], state: VOTER_STATE_ENCRYPTION_SUBMITTED, reversed: defaultReversedUint8 },
+    { addr: testVoters[1], ballot: testBallots[1], state: VOTER_STATE_ENCRYPTION_SUBMITTED, reversed: defaultReversedUint8 },
+    { addr: testVoters[2], ballot: testBallots[2], state: VOTER_STATE_ENCRYPTION_SUBMITTED, reversed: defaultReversedUint8 },
+    { addr: testVoters[3], ballot: testBallots[3], state: VOTER_STATE_ENCRYPTION_SUBMITTED, reversed: defaultReversedUint8 },
+    { addr: testVoters[4], ballot: testBallots[4], state: VOTER_STATE_ENCRYPTION_SUBMITTED, reversed: defaultReversedUint8 },
+  ]
+  const counters: Counter[] = [
+    {
+      addr: testCounterAddresses[0],
+      publicKey: testCounterPublicKeys[0],
+      state: COUNTER_STATE_PUBLIC_KEY_SUBMITTED,
+      decryption: zeroPoint,
+      reversed: defaultReversedUint8,
+    },
+    {
+      addr:testCounterAddresses[1],
+      publicKey: testCounterPublicKeys[1],
+      state: COUNTER_STATE_PUBLIC_KEY_SUBMITTED,
+      decryption: zeroPoint,
+      reversed: defaultReversedUint8,
+    },
+    {
+      addr: testCounterAddresses[2],
+      publicKey: testCounterPublicKeys[2],
+      state: COUNTER_STATE_PUBLIC_KEY_SUBMITTED,
+      decryption: zeroPoint,
+      reversed: defaultReversedUint8,
+    },
+  ]
   return {
-      candidates: testCandidates,
-      voters: testVoters,
-      sponporEthers: 1n,
-      state: 2,
-      counterPublicKeys: testCounterPublicKeys,
-      ballots: testBallots,
-      decryptPoints: [],
-      expiredBlock: 11n,
-      sumPublicKey: testSumPublicKeys,
-      sumVotes: {c1: zeroPoint, c2: zeroPoint},
-      // decryptResultPoint: zeroPoint,
-      tally: [],
+    expiredBlock: 11n,
+    sponporStateAmount: 1n,
+    counterStateAmount: 0n,
+    state: 2,
+    sumPublicKey: testSumPublicKeys,
+    sumVotes: {c1: zeroPoint, c2: zeroPoint},
+    candidates: testCandidates,
+    voters: voters,
+    counters: counters,
+    tally: [],
+    reversed: defaultReversed,
   };
 }
 
-export function TallyingStateStart(): TestState {
+export function TallyingStateStart(): AcvivityInfo {
+  const voters: Voter[] = [
+    { addr: testVoters[0], ballot: testBallots[0], state: VOTER_STATE_ENCRYPTION_SUBMITTED, reversed: defaultReversedUint8 },
+    { addr: testVoters[1], ballot: testBallots[1], state: VOTER_STATE_ENCRYPTION_SUBMITTED, reversed: defaultReversedUint8 },
+    { addr: testVoters[2], ballot: testBallots[2], state: VOTER_STATE_ENCRYPTION_SUBMITTED, reversed: defaultReversedUint8 },
+    { addr: testVoters[3], ballot: testBallots[3], state: VOTER_STATE_ENCRYPTION_SUBMITTED, reversed: defaultReversedUint8 },
+    { addr: testVoters[4], ballot: testBallots[4], state: VOTER_STATE_ENCRYPTION_SUBMITTED, reversed: defaultReversedUint8 },
+  ]
+  const counters: Counter[] = [
+    {
+      addr: testCounterAddresses[0],
+      publicKey: testCounterPublicKeys[0],
+      state: COUNTER_STATE_PUBLIC_KEY_SUBMITTED,
+      decryption: zeroPoint,
+      reversed: defaultReversedUint8,
+    },
+    {
+      addr:testCounterAddresses[1],
+      publicKey: testCounterPublicKeys[1],
+      state: COUNTER_STATE_PUBLIC_KEY_SUBMITTED,
+      decryption: zeroPoint,
+      reversed: defaultReversedUint8,
+    },
+    {
+      addr: testCounterAddresses[2],
+      publicKey: testCounterPublicKeys[2],
+      state: COUNTER_STATE_PUBLIC_KEY_SUBMITTED,
+      decryption: zeroPoint,
+      reversed: defaultReversedUint8,
+    },
+  ]
   return {
-      candidates: testCandidates,
-      voters: testVoters,
-      sponporEthers: 1n,
-      state: 3,
-      counterPublicKeys: testCounterPublicKeys,
-      ballots: testBallots,
-      decryptPoints: [],
-      expiredBlock: 11n,
-      sumPublicKey: testSumPublicKeys,
-      sumVotes: testSumBallots,
-      // decryptResultPoint: zeroPoint,
-      tally: [],
+    expiredBlock: 11n,
+    sponporStateAmount: 1n,
+    counterStateAmount: 0n,
+    state: 3,
+    sumPublicKey: testSumPublicKeys,
+    sumVotes: testSumBallots,
+    candidates: testCandidates,
+    voters: voters,
+    counters: counters,
+    tally: [],
+    reversed: defaultReversed,
   };
 }
 
-export function TallyingStateEnd(): TestState {
+export function TallyingStateEnd(): AcvivityInfo {
+  const voters: Voter[] = [
+    { addr: testVoters[0], ballot: testBallots[0], state: VOTER_STATE_ENCRYPTION_SUBMITTED, reversed: defaultReversedUint8 },
+    { addr: testVoters[1], ballot: testBallots[1], state: VOTER_STATE_ENCRYPTION_SUBMITTED, reversed: defaultReversedUint8 },
+    { addr: testVoters[2], ballot: testBallots[2], state: VOTER_STATE_ENCRYPTION_SUBMITTED, reversed: defaultReversedUint8 },
+    { addr: testVoters[3], ballot: testBallots[3], state: VOTER_STATE_ENCRYPTION_SUBMITTED, reversed: defaultReversedUint8 },
+    { addr: testVoters[4], ballot: testBallots[4], state: VOTER_STATE_ENCRYPTION_SUBMITTED, reversed: defaultReversedUint8 },
+  ]
+  const counters: Counter[] = [
+    {
+      addr: testCounterAddresses[0],
+      publicKey: testCounterPublicKeys[0],
+      state: COUNTER_STATE_DECRYPTION_SUBMITTED,
+      decryption: testDecryptPoints[0],
+      reversed: defaultReversedUint8,
+    },
+    {
+      addr:testCounterAddresses[1],
+      publicKey: testCounterPublicKeys[1],
+      state: COUNTER_STATE_DECRYPTION_SUBMITTED,
+      decryption: testDecryptPoints[1],
+      reversed: defaultReversedUint8,
+    },
+    {
+      addr: testCounterAddresses[2],
+      publicKey: testCounterPublicKeys[2],
+      state: COUNTER_STATE_DECRYPTION_SUBMITTED,
+      decryption: testDecryptPoints[2],
+      reversed: defaultReversedUint8,
+    },
+  ]
   return {
-      candidates: testCandidates,
-      voters: testVoters,
-      sponporEthers: 1n,
-      state: 3,
-      counterPublicKeys: testCounterPublicKeys,
-      ballots: testBallots,
-      decryptPoints: testDecryptPoints,
-      expiredBlock: 11n,
-      sumPublicKey: testSumPublicKeys,
-      sumVotes: testSumBallots,
-      // decryptResultPoint: zeroPoint,
-      tally: [],
+    expiredBlock: 11n,
+    sponporStateAmount: 1n,
+    counterStateAmount: 0n,
+    state: 3,
+    sumPublicKey: testSumPublicKeys,
+    sumVotes: testSumBallots,
+    candidates: testCandidates,
+    voters: voters,
+    counters: counters,
+    tally: [],
+    reversed: defaultReversed,
   };
 }
 
-export function PublishedState(): TestState {
+export function PublishedState(): AcvivityInfo {
+  const voters: Voter[] = [
+    { addr: testVoters[0], ballot: testBallots[0], state: VOTER_STATE_ENCRYPTION_SUBMITTED, reversed: defaultReversedUint8 },
+    { addr: testVoters[1], ballot: testBallots[1], state: VOTER_STATE_ENCRYPTION_SUBMITTED, reversed: defaultReversedUint8 },
+    { addr: testVoters[2], ballot: testBallots[2], state: VOTER_STATE_ENCRYPTION_SUBMITTED, reversed: defaultReversedUint8 },
+    { addr: testVoters[3], ballot: testBallots[3], state: VOTER_STATE_ENCRYPTION_SUBMITTED, reversed: defaultReversedUint8 },
+    { addr: testVoters[4], ballot: testBallots[4], state: VOTER_STATE_ENCRYPTION_SUBMITTED, reversed: defaultReversedUint8 },
+  ]
+  const counters: Counter[] = [
+    {
+      addr: testCounterAddresses[0],
+      publicKey: testCounterPublicKeys[0],
+      state: COUNTER_STATE_DECRYPTION_SUBMITTED,
+      decryption: testDecryptPoints[0],
+      reversed: defaultReversedUint8,
+    },
+    {
+      addr:testCounterAddresses[1],
+      publicKey: testCounterPublicKeys[1],
+      state: COUNTER_STATE_DECRYPTION_SUBMITTED,
+      decryption: testDecryptPoints[1],
+      reversed: defaultReversedUint8,
+    },
+    {
+      addr: testCounterAddresses[2],
+      publicKey: testCounterPublicKeys[2],
+      state: COUNTER_STATE_DECRYPTION_SUBMITTED,
+      decryption: testDecryptPoints[2],
+      reversed: defaultReversedUint8,
+    },
+  ]
   return {
-      candidates: testCandidates,
-      voters: testVoters,
-      sponporEthers: 1n,
-      state: 4,
-      counterPublicKeys: testCounterPublicKeys,
-      ballots: testBallots,
-      decryptPoints: testDecryptPoints,
-      expiredBlock: 11n,
-      sumPublicKey: testSumPublicKeys,
-      sumVotes: testSumBallots,
-      // decryptResultPoint: {
-      //   x: 537763545821696896074724415126079910619566248421975926508374659816758533755n,
-      //   y: 305233655587641910072179831927595858899726021466577042367261277343467587699n,
-      // },
-      tally: [3n, 1n, 1n, 0n, 0n],
+    expiredBlock: 11n,
+    sponporStateAmount: 1n,
+    counterStateAmount: 0n,
+    state: 4,
+    sumPublicKey: testSumPublicKeys,
+    sumVotes: testSumBallots,
+    candidates: testCandidates,
+    voters: voters,
+    counters: counters,
+    tally: [3n, 1n, 1n, 0n, 0n],
+    reversed: defaultReversed,
   };
 }
 
@@ -377,5 +603,14 @@ export async function deployFixture() {
     const voteId = Util.randomScalar(curve);
 
     return { curve, avote, counterTestValues, voterPrivates, voteId, accounts, publicClient };
-  }
+}
 
+// function initVoters(): Voter[] {
+//   return [
+//     { addr: testVoters[0], ballot: zeroPoint, state: VOTER_STATE_INIT, reversed: defaultReversedUint8 },
+//     { addr: testVoters[1], ballot: zeroPoint, state: VOTER_STATE_INIT, reversed: defaultReversedUint8 },
+//     { addr: testVoters[2], ballot: zeroPoint, state: VOTER_STATE_INIT, reversed: defaultReversedUint8 },
+//     { addr: testVoters[3], ballot: zeroPoint, state: VOTER_STATE_INIT, reversed: defaultReversedUint8 },
+//     { addr: testVoters[4], ballot: zeroPoint, state: VOTER_STATE_INIT, reversed: defaultReversedUint8 },
+//   ]
+// }

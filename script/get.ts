@@ -20,7 +20,7 @@ async function main() {
 
     const avote = await hre.viem.getContractAt("Avote", AvoteProxy, {})
 
-    let voteInfo = await avote.read.GetVoteInfo([ActivityID]);
+    let voteInfo = await avote.read.GetActivityInfo([ActivityID]);
     console.log("voteInfo: ", voteInfo);
     let counter1 = await avote.read.validCounters([0n]);
     console.log("counter1: ", counter1);
@@ -28,8 +28,6 @@ async function main() {
     console.log("counter2: ", counter2);
     let counter3 = await avote.read.validCounters([2n]);
     console.log("counter3: ", counter3);
-
-    console.log("ballot1: ", voteInfo.ballots[0])
 
     const publickeyVerifier = await avote.read.publicKeyVerifier();
     console.log("publickeyVerifier: ", publickeyVerifier);

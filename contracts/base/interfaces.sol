@@ -27,6 +27,7 @@ struct TallyProof {
     uint256[] tally;
 }
 
+// deprecated
 struct VoteInfo {
     address[] candidates;
     address[] voters;
@@ -41,15 +42,45 @@ struct VoteInfo {
     uint256[] tally;
 }
 
+struct Counter {
+    address addr;
+    Point publicKey;
+    uint8 state;
+    Point decryption;
+    uint256[8] reversed;
+}
+
+struct Voter {
+    address addr;
+    uint8 state;
+    Cipher ballot;
+    uint256[8] reversed;
+}
+
+struct ActivityInfo {
+    uint256 expiredBlock;
+    uint256 sponporStateAmount;
+    uint256 counterStateAmount;
+    uint8 state;
+    Point sumPublicKey;
+    Cipher sumVotes;
+    address[] candidates;
+    Voter[] voters;
+    Counter[] counters;
+    uint256[] tally;
+    uint256[16] reversed;
+}
+
 interface IAvote {
-    function initialize(address _voteVerifier, address _publicKeyVerifier, address _decryptVerifier, address _sumVerifier, address _scalarMulGVerifier) external;
+    function Initiate(address[] calldata candidates, address[] calldata voterAddresses, uint256 id, uint256 initiateStateBlockNumbers) external payable;
     function Vote(uint256 id, Proof calldata proof, Cipher calldata cipher) external;
-    function SubmitPublicKey(uint256 id, uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[2] calldata _pubSignals) external payable;
-    function Decrypt(uint256 id, uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[6] calldata _pubSignals) external;
+    function SubmitPublicKey(uint256 id, Proof calldata proof, Point calldata publicKey) external payable;
+    function Decrypt(uint256 id, Proof calldata proof, Point calldata dMulC1) external;
     function ChangeStateToVoting(uint256 id, SumProof[] calldata sumProofs) external;
     function ChangeStateToTallying(uint256 id, SumProof[] calldata proofsC1, SumProof[] calldata proofsC2) external;
     function ChangeStateToPublished(uint256 id, SumProof[] memory proofs, TallyProof memory tallyProof) external;
-    function GetVoteInfo(uint256 id) view external returns(VoteInfo memory);
+    function GetVoteInfo(uint256 id) view external returns(VoteInfo memory);    // deprecated
+    function GetActivityInfo(uint256 id) view external returns(ActivityInfo memory);
 
     function MigrateScalarMulGCircuit(address newAddress) external;
 }

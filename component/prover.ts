@@ -1,6 +1,7 @@
 import { BabyJub, buildBabyjub, Point } from "circomlibjs";
 import * as snarkjs from "snarkjs";
 import * as Util from "./util";
+import { decrypt } from "dotenv";
 
 interface BaseCreateSignalParam {
 
@@ -23,6 +24,7 @@ interface CreateVoteSignalsParam {
 
 interface CreatePublicKeySignalsParam {
     privateKey: bigint;
+    publicKey: Util.BigPoint;
 }
 
 interface CreateScalarMulGSignalsParam {
@@ -31,8 +33,9 @@ interface CreateScalarMulGSignalsParam {
 
 interface CreateDecryptSignalsParam {
     privateKey: bigint;
-    publicKey: Point;
-    c1: Point;
+    publicKey: Util.BigPoint;
+    c1: Util.BigPoint;
+    decryption: Util.BigPoint;
 }
 
 interface CreateCheckSumParam {
@@ -83,15 +86,12 @@ export class PublicKey extends Prover<2> {
         super("./circom/compile/public_key_js/public_key.wasm", "./circom/public_key_0001.zkey", 2);
     }
     async createSignals(params: CreatePublicKeySignalsParam): Promise<snarkjs.CircuitSignals> {
-        const curve = await buildBabyjub();
-        const publicKey: Point = curve.mulPointEscalar(curve.Base8, params.privateKey);
         return {
             privateKey: params.privateKey,
-            publicKey:  [curve.F.toString(publicKey[0]), curve.F.toString(publicKey[1])],
+            publicKey:  [params.publicKey.x, params.publicKey.y],
         };
     }
 }
-
 
 export class Voter extends Prover<6> {
     public constructor() {
@@ -127,14 +127,11 @@ export class Decrypt extends Prover<6> {
         super("./circom/compile/decrypt_js/decrypt.wasm", "./circom/decrypt_0001.zkey", 6);
     }
     async createSignals(params: CreateDecryptSignalsParam): Promise<snarkjs.CircuitSignals> {
-        const curve = await buildBabyjub();
-        const dMulC1: Point = curve.mulPointEscalar(params.c1, params.privateKey);
         return {
-            // d:   params.privateKey.toString(2).padStart(256,'0').split('').map(Number),
             privateKey: params.privateKey,
-            publicKey: [ curve.F.toString(params.publicKey[0]), curve.F.toString(params.publicKey[1]) ],
-            c1: [curve.F.toString(params.c1[0]),  curve.F.toString(params.c1[1])],
-            dMulC1: [ curve.F.toString(dMulC1[0]), curve.F.toString(dMulC1[1]) ],
+            publicKey: [params.publicKey.x, params.publicKey.y],
+            c1: [params.c1.x, params.c1.y],
+            dMulC1: [params.decryption.x, params.decryption.y],
         };
     }
 }
@@ -259,5 +256,48 @@ export async function GenerateVoteProof(curve: BabyJub, params: CreateVoteProofI
             c1: c1,
             c2: c2
         }
+    }
+}
+
+export async function GenerateSubmitPublicKeyProof(curve: BabyJub, privateKey: bigint): Promise<Util.SubmitPublicKeyProof> {
+    let prover = new PublicKey();
+
+    const publicKey: Util.BigPoint = Util.toBigPoint(curve, curve.mulPointEscalar(curve.Base8, privateKey));
+
+    const proof = await prover.prove({
+        publicKey: publicKey,
+        privateKey: privateKey,     
+    });
+
+    return {
+        proof: {
+            a: proof[0],
+            b: proof[1],
+            c: proof[2],
+        },
+        publicKey: publicKey,
+    }
+}
+
+export async function GenerateDecryptProof(curve: BabyJub, privateKey: bigint, c1: Util.BigPoint): Promise<Util.DecryptProof> {
+    let prover = new Decrypt();
+
+    const publicKey: Util.BigPoint = Util.toBigPoint(curve, curve.mulPointEscalar(curve.Base8, privateKey));
+    const decryption: Util.BigPoint = Util.toBigPoint(curve, curve.mulPointEscalar(Util.toPoint(curve, c1), privateKey));
+
+    const proof = await prover.prove({
+        publicKey: publicKey,
+        privateKey: privateKey,
+        c1: c1,
+        decryption: decryption,
+    });
+
+    return {
+        proof: {
+            a: proof[0],
+            b: proof[1],
+            c: proof[2],
+        },
+        decryption: decryption,
     }
 }

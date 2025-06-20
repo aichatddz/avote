@@ -11,7 +11,7 @@ contract AvoteForTest is Avote {
         initialize(_verifierAddr, _publicKeyVerifier, _decryptVerifier, address(_sumVerifier), address(_scalarMulGVerifier));
     }
 
-    function SetTestState(uint256 id, VoteInfo memory stateInfo) external {
-        voteInfos[id] = stateInfo;
+    function SetTestState(uint256 id, ActivityInfo memory stateInfo) external {
+        activityInfos[id] = stateInfo;
     }
 }
