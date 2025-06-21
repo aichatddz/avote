@@ -58,7 +58,9 @@ struct Voter {
 }
 
 struct ActivityInfo {
-    uint256 expiredBlock;
+    uint256 expiredInitiatingBlock;
+    uint256 expiredVotingBlock;
+    uint256 expiredTallyingBlock;
     uint256 sponporStateAmount;
     uint256 counterStateAmount;
     uint8 state;
@@ -72,10 +74,17 @@ struct ActivityInfo {
 }
 
 interface IAvote {
-    function Initiate(address[] calldata candidates, address[] calldata voterAddresses, uint256 id, uint256 initiateStateBlockNumbers) external payable;
+    function Initiate(
+        address[] calldata candidates,
+        address[] calldata voterAddresses,
+        uint256 id,
+        uint256 initiateStateBlockNumbers,
+        uint256 votingStateBlockNumbers,
+        uint256 tallyingStateBlockNumbers
+    ) external payable;
     function Vote(uint256 id, Proof calldata proof, Cipher calldata cipher) external;
     function SubmitPublicKey(uint256 id, Proof calldata proof, Point calldata publicKey) external payable;
-    function Decrypt(uint256 id, Proof calldata proof, Point calldata dMulC1) external;
+    function Decrypt(uint256 id, Proof calldata proof, Point calldata decryption) external;
     function ChangeStateToVoting(uint256 id, SumProof[] calldata sumProofs) external;
     function ChangeStateToTallying(uint256 id, SumProof[] calldata proofsC1, SumProof[] calldata proofsC2) external;
     function ChangeStateToPublished(uint256 id, SumProof[] memory proofs, TallyProof memory tallyProof) external;

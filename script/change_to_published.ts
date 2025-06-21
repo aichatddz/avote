@@ -38,15 +38,15 @@ async function main() {
     const contract = await hre.viem.getContractAt("Avote", AvoteProxy, {
         client: {wallet: walletClient},
     })
-    let voteInfo = await contract.read.GetVoteInfo([ActivityID]);
+    let activityInfo = await contract.read.GetActivityInfo([ActivityID]);
 
     const curve = await buildBabyjub()
     
-    let points: BigPoint[] = [voteInfo.sumVotes.c2];
-    for (let i = 0; i < voteInfo.decryptPoints.length; i++) {
+    let points: BigPoint[] = [activityInfo.sumVotes.c2];
+    for (let i = 0; i < activityInfo.counters.length; i++) {
       points.push({
-        x: -voteInfo.decryptPoints[i].x,
-        y: voteInfo.decryptPoints[i].y,
+        x: -activityInfo.counters[i].decryption.x,
+        y: activityInfo.counters[i].decryption.y,
       })
     }
 
@@ -61,12 +61,12 @@ async function main() {
 
     let result = DecodePointToScalar(curve,
         toPoint(curve, proofs[proofs.length-1].sum),
-        BigInt(voteInfo.voters.length),
-        BigInt(voteInfo.candidates.length),
+        BigInt(activityInfo.voters.length),
+        BigInt(activityInfo.candidates.length),
     )
     let scalar = 0n;
     for (let i = 0; i < result.length; i++) {
-      scalar += BigInt(voteInfo.voters.length+1)**BigInt(result.length-1-i)*result[i];
+      scalar += BigInt(activityInfo.voters.length+1)**BigInt(result.length-1-i)*result[i];
     }
     let proof = await (new ScalarMulG()).prove({scalar: BigInt(scalar)});
     let s: PublishProof = {

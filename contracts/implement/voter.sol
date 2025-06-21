@@ -64,7 +64,19 @@ contract Avote is IAvote, Initializable, OwnableUpgradeable, UUPSUpgradeable  {
         emit UpgradedLog(newImplementation);
     }
 
-    function Initiate(address[] calldata candidates, address[] calldata voterAddresses, uint256 id, uint256 initiateStateBlockNumbers) external payable {
+    function SetSumVerifier(address verifier) public onlyOwner {
+        sumVerifier = SumVerifier(verifier);
+        emit VerifierChangedLog("sum", verifier);
+    }
+
+    function Initiate(
+        address[] calldata candidates,
+        address[] calldata voterAddresses,
+        uint256 id,
+        uint256 initiateStateBlockNumbers,
+        uint256 votingStateBlockNumbers,
+        uint256 tallyingStateBlockNumbers
+    ) external payable {
         require(msg.value >= 1, "less value");
         require(activityInfos[id].state == 0, "id is existed");
 
@@ -79,7 +91,9 @@ contract Avote is IAvote, Initializable, OwnableUpgradeable, UUPSUpgradeable  {
         activityInfos[id].candidates = candidates;
         activityInfos[id].sponporStateAmount = msg.value;
         activityInfos[id].state = STATE_INITIATINT;
-        activityInfos[id].expiredBlock = block.number + initiateStateBlockNumbers;
+        activityInfos[id].expiredInitiatingBlock = block.number + initiateStateBlockNumbers;
+        activityInfos[id].expiredVotingBlock = activityInfos[id].expiredInitiatingBlock + votingStateBlockNumbers;
+        activityInfos[id].expiredTallyingBlock = activityInfos[id].expiredVotingBlock + tallyingStateBlockNumbers;
         activityInfos[id].sumPublicKey = getZeroPoint();
         activityInfos[id].sumVotes = Cipher({c1: getZeroPoint(), c2: getZeroPoint()});
         activityInfos[id].tally = new uint256[](0);
@@ -87,9 +101,16 @@ contract Avote is IAvote, Initializable, OwnableUpgradeable, UUPSUpgradeable  {
         emit ChangeStateLog(id, STATE_INITIATINT);
     }
 
-    function SetSumVerifier(address verifier) public onlyOwner {
-        sumVerifier = SumVerifier(verifier);
-        emit VerifierChangedLog("sum", verifier);
+    function SubmitPublicKey(uint256 id, Proof calldata proof, Point calldata publicKey) external payable {
+        require(isValidCounter(msg.sender), string.concat("invalid counter: ", Strings.toHexString(uint256(uint160(msg.sender)), 20)));
+        require(activityInfos[id].state == STATE_INITIATINT, "state is not initiated");        
+        Counter storage counter = getCounter(id, _msgSender());
+        require(counter.state == COUNTER_STATE_NONE, "duplicated submitting public key");
+        bool isVerified = publicKeyVerifier.verifyProof(proof.a, proof.b, proof.c, [publicKey.x, publicKey.y]);
+        require(isVerified, "SubmitPublicKey proof failed");
+        counter.state = COUNTER_STATE_PUBLIC_KEY_SUBMITTED;
+        counter.publicKey = publicKey;
+        emit Action("submit_public_key", id);
     }
 
     function Vote(uint256 id, Proof calldata proof, Cipher calldata cipher) external {
@@ -112,18 +133,6 @@ contract Avote is IAvote, Initializable, OwnableUpgradeable, UUPSUpgradeable  {
             c2: cipher.c2
         });
         emit Action("vote", id);
-    }
-
-    function SubmitPublicKey(uint256 id, Proof calldata proof, Point calldata publicKey) external payable {
-        require(isValidCounter(msg.sender), string.concat("invalid counter: ", Strings.toHexString(uint256(uint160(msg.sender)), 20)));
-        require(activityInfos[id].state == STATE_INITIATINT, "state is not initiated");        
-        Counter storage counter = getCounter(id, _msgSender());
-        require(counter.state == COUNTER_STATE_NONE, "duplicated submitting public key");
-        bool isVerified = publicKeyVerifier.verifyProof(proof.a, proof.b, proof.c, [publicKey.x, publicKey.y]);
-        require(isVerified, "SubmitPublicKey proof failed");
-        counter.state = COUNTER_STATE_PUBLIC_KEY_SUBMITTED;
-        counter.publicKey = publicKey;
-        emit Action("submit_public_key", id);
     }
 
     function Decrypt(uint256 id, Proof calldata proof, Point calldata decryption) external {
@@ -160,7 +169,7 @@ contract Avote is IAvote, Initializable, OwnableUpgradeable, UUPSUpgradeable  {
 
         require(activityInfos[id].state == STATE_INITIATINT, "state is not initiated");
         require(submittedPublicKeyCount == validCounters.length || 
-            activityInfos[id].expiredBlock <= block.number, "cannot change state yet");
+            activityInfos[id].expiredInitiatingBlock <= block.number, "cannot change state yet");
         require((submittedPublicKeyCount-1) / (WINDOW_SIZE-1) + 1 == sumProofs.length, "the proofs' length is not match with the counters' number");
 
         Point[] memory points = new Point[](submittedPublicKeyCount);
@@ -180,21 +189,12 @@ contract Avote is IAvote, Initializable, OwnableUpgradeable, UUPSUpgradeable  {
         emit ChangeStateLog(id, STATE_VOTING);
     }
 
-    function ballotsPoint(uint256 id, uint256 index, uint256 c) view internal returns (Point memory) {
-        if (c == 0) {
-            return activityInfos[id].voters[index].ballot.c1;
-        } else if (c == 1) {
-            return activityInfos[id].voters[index].ballot.c2;
-        }
-        return getZeroPoint();
-    }
-
     function ChangeStateToTallying(uint256 id, SumProof[] calldata proofsC1, SumProof[] calldata proofsC2) external {
         uint256 votedCount = getVotedCount(id);
 
         require(activityInfos[id].state == STATE_VOTING, "state is not voting");
         require(activityInfos[id].voters.length == votedCount || 
-            activityInfos[id].expiredBlock <= block.number, "cannot change state yet");
+            activityInfos[id].expiredVotingBlock <= block.number, "cannot change state yet");
         require((votedCount-1) / (WINDOW_SIZE-1) + 1 == proofsC1.length, "the length of proofs c1 is not match with the counters' number");
         require((votedCount-1) / (WINDOW_SIZE-1) + 1 == proofsC2.length, "the length of proofs c2 is not match with the counters' number");
 
@@ -225,14 +225,14 @@ contract Avote is IAvote, Initializable, OwnableUpgradeable, UUPSUpgradeable  {
     }
 
     function ChangeStateToPublished(uint256 id, SumProof[] memory proofs, TallyProof memory tallyProof) external {
-        uint256 decryptedCounter = getDecryptedCount(id);
+        uint256 decryptedCount = getDecryptedCount(id);
         require(activityInfos[id].state == STATE_TALLYING, "state is not tallying");
-        require(decryptedCounter == activityInfos[id].counters.length || 
-            activityInfos[id].expiredBlock <= block.number, "cannot change state yet");
-        require((decryptedCounter-1) / (WINDOW_SIZE-1) + 1 == proofs.length, "the length of proofs is not match with the decryptPoints' number");
+        require(decryptedCount == activityInfos[id].counters.length || 
+            activityInfos[id].expiredTallyingBlock <= block.number, "cannot change state yet");
+        require((decryptedCount-1) / (WINDOW_SIZE-1) + 1 == proofs.length, "the length of proofs is not match with the decryptPoints' number");
         require(tallyProof.tally.length == activityInfos[id].voters.length, "tally size is not equal to proof tally size");
 
-        Point[] memory points = new Point[](decryptedCounter + 1);
+        Point[] memory points = new Point[](decryptedCount + 1);
         points[0] = activityInfos[id].sumVotes.c2;
         for (uint256 i = 0; i < activityInfos[id].counters.length; i++) {
             if (activityInfos[id].counters[i].state != COUNTER_STATE_DECRYPTION_SUBMITTED) {
@@ -296,13 +296,22 @@ contract Avote is IAvote, Initializable, OwnableUpgradeable, UUPSUpgradeable  {
         return true;
     }
 
-    // deprecated
+    // deprecated. use GetActivityInfo
     function GetVoteInfo(uint256 id) view external returns(VoteInfo memory) {
         return voteInfos[id];
     }
 
     function GetActivityInfo(uint256 id) view external returns(ActivityInfo memory) {
         return activityInfos[id];
+    }
+
+    function ballotsPoint(uint256 id, uint256 index, uint256 c) view internal returns (Point memory) {
+        if (c == 0) {
+            return activityInfos[id].voters[index].ballot.c1;
+        } else if (c == 1) {
+            return activityInfos[id].voters[index].ballot.c2;
+        }
+        return getZeroPoint();
     }
 
     function MigrateScalarMulGCircuit(address newAddress) external onlyOwner {

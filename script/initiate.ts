@@ -45,9 +45,9 @@ async function main() {
             '0xfC031A45517C5E1EB8b7acFCb14179acb3a1E7ef',
             '0x576b3B55240a73adbB4FB97126CDb16d477b8001',
             '0xFaDd1179EB22037A52c8DB836fFbD16a5288a648',
-        ], ActivityID, 5n
+        ], ActivityID, 5n, 3n, 2n
     ], {
-        value: 2n
+        value: 3n
     });
 
 }

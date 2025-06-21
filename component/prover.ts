@@ -1,7 +1,6 @@
 import { BabyJub, buildBabyjub, Point } from "circomlibjs";
 import * as snarkjs from "snarkjs";
 import * as Util from "./util";
-import { decrypt } from "dotenv";
 
 interface BaseCreateSignalParam {
 

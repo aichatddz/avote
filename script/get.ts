@@ -21,7 +21,8 @@ async function main() {
     const avote = await hre.viem.getContractAt("Avote", AvoteProxy, {})
 
     let voteInfo = await avote.read.GetActivityInfo([ActivityID]);
-    console.log("voteInfo: ", voteInfo);
+    console.log("voteInfo: ");
+    console.dir(voteInfo, { depth: null, colors: true });
     let counter1 = await avote.read.validCounters([0n]);
     console.log("counter1: ", counter1);
     let counter2 = await avote.read.validCounters([1n]);

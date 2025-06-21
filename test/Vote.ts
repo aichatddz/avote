@@ -26,7 +26,7 @@ describe("Verifier", function () {
         fixture.accounts[12].account.address,
         fixture.accounts[13].account.address,
         fixture.accounts[14].account.address,
-      ], fixture.voteId, 3n],
+      ], fixture.voteId, 3n, 10n, 9n],
       value: 1n
     })
     await fixture.publicClient.waitForTransactionReceipt({hash: initiatedRsp});
@@ -150,12 +150,6 @@ describe("Verifier", function () {
     const fixture = await loadFixture(fixtureTest.deployFixture);
     await fixture.avote.write.SetTestState([fixture.voteId, fixtureTest.TallyingStateStart()]);
     for (let i = 0; i < fixture.counterTestValues.length; i++) {
-      // let prover = new Prover.Decrypt();
-      // const proof = await prover.prove({
-      //   privateKey: fixture.counterTestValues[i].private,
-      //   publicKey: fixture.curve.mulPointEscalar(fixture.curve.Base8, fixture.counterTestValues[i].private),
-      //   c1: Util.toPoint(fixture.curve, fixtureTest.TallyingStateStart().sumVotes.c1),
-      // });
       const proof = await Prover.GenerateDecryptProof(fixture.curve, fixture.counterTestValues[i].private, fixtureTest.TallyingStateStart().sumVotes.c1);
       let wallet = fixture.accounts[i+1];
       let cli = await hre.viem.getContractAt("Avote", fixture.avote.address, {

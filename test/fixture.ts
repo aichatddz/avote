@@ -53,7 +53,9 @@ interface Counter {
 }
 
 interface AcvivityInfo {
-    expiredBlock: bigint;
+    expiredInitiatingBlock: bigint;
+    expiredVotingBlock: bigint;
+    expiredTallyingBlock: bigint;
     sponporStateAmount: bigint;
     counterStateAmount: bigint;
     state: number;
@@ -204,7 +206,9 @@ export function InitiatedStateStart(): AcvivityInfo {
   ]
   const counters: Counter[] = []
   return {
-    expiredBlock: 11n,
+    expiredInitiatingBlock: 11n,
+    expiredVotingBlock: 21n,
+    expiredTallyingBlock: 30n,
     sponporStateAmount: 1n,
     counterStateAmount: 0n,
     state: 1,
@@ -250,7 +254,9 @@ export function InitiatedStateEnd(): AcvivityInfo {
     },
   ]
   return {
-    expiredBlock: 11n,
+    expiredInitiatingBlock: 11n,
+    expiredVotingBlock: 21n,
+    expiredTallyingBlock: 30n,
     sponporStateAmount: 1n,
     counterStateAmount: 0n,
     state: 1,
@@ -296,7 +302,9 @@ export function VotingStateStart(): AcvivityInfo {
     },
   ]
   return {
-    expiredBlock: 11n,
+    expiredInitiatingBlock: 11n,
+    expiredVotingBlock: 21n,
+    expiredTallyingBlock: 30n,
     sponporStateAmount: 1n,
     counterStateAmount: 0n,
     state: 2,
@@ -342,7 +350,9 @@ export function VotingStateEnd(): AcvivityInfo {
     },
   ]
   return {
-    expiredBlock: 11n,
+    expiredInitiatingBlock: 11n,
+    expiredVotingBlock: 21n,
+    expiredTallyingBlock: 30n,
     sponporStateAmount: 1n,
     counterStateAmount: 0n,
     state: 2,
@@ -388,7 +398,9 @@ export function TallyingStateStart(): AcvivityInfo {
     },
   ]
   return {
-    expiredBlock: 11n,
+    expiredInitiatingBlock: 11n,
+    expiredVotingBlock: 21n,
+    expiredTallyingBlock: 30n,
     sponporStateAmount: 1n,
     counterStateAmount: 0n,
     state: 3,
@@ -434,7 +446,9 @@ export function TallyingStateEnd(): AcvivityInfo {
     },
   ]
   return {
-    expiredBlock: 11n,
+    expiredInitiatingBlock: 11n,
+    expiredVotingBlock: 21n,
+    expiredTallyingBlock: 30n,
     sponporStateAmount: 1n,
     counterStateAmount: 0n,
     state: 3,
@@ -480,7 +494,9 @@ export function PublishedState(): AcvivityInfo {
     },
   ]
   return {
-    expiredBlock: 11n,
+    expiredInitiatingBlock: 11n,
+    expiredVotingBlock: 21n,
+    expiredTallyingBlock: 30n,
     sponporStateAmount: 1n,
     counterStateAmount: 0n,
     state: 4,
