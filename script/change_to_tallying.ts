@@ -9,7 +9,7 @@ import { AvoteProxy } from "../deployments/contracts";
 import { GenerateCheckSumProof, PublicKey } from "../component/prover";
 import { ActivityID } from "./const";
 import { buildBabyjub } from "circomlibjs";
-import { BigPoint, SumProof } from "../component/util";
+import { BigCipher, BigPoint, SumProof } from "../component/util";
 
 const params = {
     oracle_wallet_private: process.env.SEPOLIA_PK_ORACLE,
@@ -38,16 +38,15 @@ async function main() {
     const contract = await hre.viem.getContractAt("Avote", AvoteProxy, {
         client: {wallet: walletClient},
     })
-    let voteInfo = await contract.read.GetVoteInfo([ActivityID]);
+    let activityInfo = await contract.read.GetActivityInfo([ActivityID]);
 
     const curve = await buildBabyjub()
     
-    let ballots = voteInfo.ballots;
     let pointsC1: BigPoint[] = [];
     let pointsC2: BigPoint[] = [];
-    for (let i = 0; i < ballots.length; i++) {
-      pointsC1.push(ballots[i].c1);
-      pointsC2.push(ballots[i].c2);
+    for (let i = 0; i < activityInfo.voters.length; i++) {
+      pointsC1.push(activityInfo.voters[i].ballot.c1);
+      pointsC2.push(activityInfo.voters[i].ballot.c2);
     }
 
     let proofsC1: SumProof[] = [];

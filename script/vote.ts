@@ -13,7 +13,7 @@ import { buildBabyjub } from "circomlibjs";
 
 const params = {
     voter_wallet_private: process.env.SEPOLIA_PK_VOTER5,
-    value: 3n,
+    value: 4n,
 }
 
 async function main() {
@@ -39,14 +39,14 @@ async function main() {
     const contract = await hre.viem.getContractAt("Avote", AvoteProxy, {
         client: {wallet: walletClient},
     })
-    let voteInfo = await contract.read.GetVoteInfo([ActivityID]);
+    let activityInfo = await contract.read.GetActivityInfo([ActivityID]);
 
     const curve = await buildBabyjub();
     const proof = await GenerateVoteProof(curve, {
-        publicKey: voteInfo.sumPublicKey,
+        publicKey: activityInfo.sumPublicKey,
         value: params.value,
-        voterNum: BigInt(voteInfo.voters.length),
-        candidateNum: BigInt(voteInfo.candidates.length),
+        voterNum: BigInt(activityInfo.voters.length),
+        candidateNum: BigInt(activityInfo.candidates.length),
         randomK: randomScalar(curve),
     });
 

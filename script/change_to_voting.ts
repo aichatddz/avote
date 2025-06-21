@@ -6,10 +6,10 @@ import { privateKeyToAccount } from "viem/accounts";
 import { configDotenv } from "dotenv"
 import { resolve } from "path";
 import { AvoteProxy } from "../deployments/contracts";
-import { GenerateCheckSumProof, PublicKey } from "../component/prover";
+import { GenerateCheckSumProof } from "../component/prover";
 import { ActivityID } from "./const";
 import { buildBabyjub } from "circomlibjs";
-import { SumProof } from "../component/util";
+import { SumProof, BigPoint } from "../component/util";
 
 const params = {
     oracle_wallet_private: process.env.SEPOLIA_PK_ORACLE,
@@ -38,10 +38,14 @@ async function main() {
     const contract = await hre.viem.getContractAt("Avote", AvoteProxy, {
         client: {wallet: walletClient},
     })
-    let voteInfo = await contract.read.GetVoteInfo([ActivityID]);
+    let activityInfo = await contract.read.GetActivityInfo([ActivityID]);
 
+    const counterPublicKeys: BigPoint[] = [];
+    for (let i = 0; i < activityInfo.counters.length; i++) {
+        counterPublicKeys.push(activityInfo.counters[i].publicKey);
+    }
     const curve = await buildBabyjub()
-    let proofs = await GenerateCheckSumProof(curve, voteInfo.counterPublicKeys)
+    let proofs = await GenerateCheckSumProof(curve, counterPublicKeys);
     let p: SumProof[] = [];
     for (let i = 0; i < proofs.length; i++) {
       p.push({
@@ -53,7 +57,7 @@ async function main() {
 }
 
 main().then(()=>{
-    console.log("submit_public_key succeeded");
+    console.log("change_to_voting succeeded");
     process.exit(0);
 }).catch((error) => {
     console.error(error);

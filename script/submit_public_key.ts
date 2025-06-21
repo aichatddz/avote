@@ -6,8 +6,9 @@ import { privateKeyToAccount } from "viem/accounts";
 import { configDotenv } from "dotenv"
 import { resolve } from "path";
 import { AvoteProxy } from "../deployments/contracts";
-import { PublicKey } from "../component/prover";
+import * as Prover from "../component/prover";
 import { ActivityID } from "./const";
+import { buildBabyjub } from "circomlibjs";
 
 const params = {
     counter_wallet_private: process.env.SEPOLIA_PK_COUNTER3,
@@ -38,16 +39,14 @@ async function main() {
         transport: http(`https://eth-sepolia.g.alchemy.com/v2/${SEPOLIA_ALCHEMY_AK}`),
     });
 
+    const curve = await buildBabyjub();
 
-    let prover = new PublicKey();
-    const proof = await prover.prove({
-        privateKey: BigInt(params.counter_private),
-    });
-
+    const proof = await Prover.GenerateSubmitPublicKeyProof(curve, BigInt(params.counter_private));
+    
     const avote = await hre.viem.getContractAt("Avote", AvoteProxy, {
         client: {wallet: walletClient}
     })
-    await avote.write.SubmitPublicKey([ActivityID, ...proof]);
+    await avote.write.SubmitPublicKey([ActivityID, proof.proof, proof.publicKey]);
 }
 
 main().then(()=>{

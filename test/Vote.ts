@@ -5,6 +5,7 @@ import * as Util from "../component/util"
 import * as Prover from "../component/prover"
 import * as fixtureTest from "./fixture"
 import { buildBabyjub } from "circomlibjs";
+import { Cipher } from "crypto";
 
 describe("Verifier", function () {
   it("Should initiate a vote successfully", async function () {
@@ -25,40 +26,42 @@ describe("Verifier", function () {
         fixture.accounts[12].account.address,
         fixture.accounts[13].account.address,
         fixture.accounts[14].account.address,
-      ], fixture.voteId, 3n],
+      ], fixture.voteId, 3n, 10n, 9n],
       value: 1n
     })
     await fixture.publicClient.waitForTransactionReceipt({hash: initiatedRsp});
     const event = await fixture.avote.getEvents.ChangeStateLog();
     expect(event).to.have.lengthOf(1);
-    expect(await fixture.avote.read.GetVoteInfo([fixture.voteId])).to.be.deep.equals(fixtureTest.InitiatedStateStart());
+    expect(await fixture.avote.read.GetActivityInfo([fixture.voteId])).to.be.deep.equals(fixtureTest.InitiatedStateStart());
   })
 
   it("Should add the counter's public keys correctly", async function () {
     const fixture = await loadFixture(fixtureTest.deployFixture);
     await fixture.avote.write.SetTestState([fixture.voteId, fixtureTest.InitiatedStateStart()]);
 
-    let prover = new Prover.PublicKey();
     for (let i = 0; i < fixture.counterTestValues.length; i++) {
-      const proof = await prover.prove({
-        privateKey: fixture.counterTestValues[i].private,
-      });
+      const proof = await Prover.GenerateSubmitPublicKeyProof(fixture.curve, fixture.counterTestValues[i].private);
       let cli = await hre.viem.getContractAt("Avote", fixture.avote.address, {
         client: { wallet: fixture.accounts[i+1]},
       })
-      const rsp = await cli.write.SubmitPublicKey([fixture.voteId, ...proof]);
+      const rsp = await cli.write.SubmitPublicKey([fixture.voteId, proof.proof, proof.publicKey]);
       await fixture.publicClient.waitForTransactionReceipt({hash: rsp});
       const voteEvents = await cli.getEvents.Action();
       expect(voteEvents).to.have.lengthOf(1);
     }
-    expect(await fixture.avote.read.GetVoteInfo([fixture.voteId])).to.be.deep.equals(fixtureTest.InitiatedStateEnd());
+    expect(await fixture.avote.read.GetActivityInfo([fixture.voteId])).to.be.deep.equals(fixtureTest.InitiatedStateEnd());
   })
 
   it("Should change the state to voting successfully", async function () {
     const fixture = await loadFixture(fixtureTest.deployFixture);
     await fixture.avote.write.SetTestState([fixture.voteId, fixtureTest.InitiatedStateEnd()]);
 
-    let proofs = await Prover.GenerateCheckSumProof(fixture.curve, fixtureTest.InitiatedStateEnd().counterPublicKeys)
+    let counterPublicKeys: Util.BigPoint[] = [
+      fixtureTest.InitiatedStateEnd().counters[0].publicKey,
+      fixtureTest.InitiatedStateEnd().counters[1].publicKey,
+      fixtureTest.InitiatedStateEnd().counters[2].publicKey,
+    ]
+    let proofs = await Prover.GenerateCheckSumProof(fixture.curve, counterPublicKeys);
     let p: Util.SumProof[] = [];
     for (let i = 0; i < proofs.length; i++) {
       p.push({
@@ -71,7 +74,7 @@ describe("Verifier", function () {
     await fixture.publicClient.waitForTransactionReceipt({hash: rsp});
     const event = await fixture.avote.getEvents.ChangeStateLog();
     expect(event).to.have.lengthOf(1);
-    expect(await fixture.avote.read.GetVoteInfo([fixture.voteId])).to.be.deep.equals(fixtureTest.VotingStateStart());
+    expect(await fixture.avote.read.GetActivityInfo([fixture.voteId])).to.be.deep.equals(fixtureTest.VotingStateStart());
   })
 
   it("Should submit the right votes", async () => {
@@ -96,14 +99,20 @@ describe("Verifier", function () {
       const voteEvents = await fixture.avote.getEvents.Action();
       expect(voteEvents).to.have.lengthOf(1);
     }
-    expect(await fixture.avote.read.GetVoteInfo([fixture.voteId])).to.be.deep.equals(fixtureTest.VotingStateEnd());
+    expect(await fixture.avote.read.GetActivityInfo([fixture.voteId])).to.be.deep.equals(fixtureTest.VotingStateEnd());
   })
 
   it("Should change the state to tallying successfully", async function () {
     const fixture = await loadFixture(fixtureTest.deployFixture);
     await fixture.avote.write.SetTestState([fixture.voteId, fixtureTest.VotingStateEnd()]);
 
-    let ballots = fixtureTest.VotingStateEnd().ballots;
+    let ballots: Util.BigCipher[] = [
+      fixtureTest.VotingStateEnd().voters[0].ballot,
+      fixtureTest.VotingStateEnd().voters[1].ballot,
+      fixtureTest.VotingStateEnd().voters[2].ballot,
+      fixtureTest.VotingStateEnd().voters[3].ballot,
+      fixtureTest.VotingStateEnd().voters[4].ballot,
+    ];
     let pointsC1: Util.BigPoint[] = [];
     let pointsC2: Util.BigPoint[] = [];
     for (let i = 0; i < ballots.length; i++) {
@@ -134,25 +143,24 @@ describe("Verifier", function () {
     await fixture.publicClient.waitForTransactionReceipt({hash: rsp});
     const event = await fixture.avote.getEvents.ChangeStateLog();
     expect(event).to.have.lengthOf(1);
-    expect(await fixture.avote.read.GetVoteInfo([fixture.voteId])).to.be.deep.equals(fixtureTest.TallyingStateStart());
+    expect(await fixture.avote.read.GetActivityInfo([fixture.voteId])).to.be.deep.equals(fixtureTest.TallyingStateStart());
   })
 
   it("Counter should decrypt the tally correctly", async ()=> {
     const fixture = await loadFixture(fixtureTest.deployFixture);
     await fixture.avote.write.SetTestState([fixture.voteId, fixtureTest.TallyingStateStart()]);
     for (let i = 0; i < fixture.counterTestValues.length; i++) {
-      let prover = new Prover.Decrypt();
-      const proof = await prover.prove({
-        privateKey: fixture.counterTestValues[i].private,
-        publicKey: fixture.curve.mulPointEscalar(fixture.curve.Base8, fixture.counterTestValues[i].private),
-        c1: Util.toPoint(fixture.curve, fixtureTest.TallyingStateStart().sumVotes.c1),
-      });
-      const rsp = await fixture.avote.write.Decrypt([fixture.voteId, ...proof]);
+      const proof = await Prover.GenerateDecryptProof(fixture.curve, fixture.counterTestValues[i].private, fixtureTest.TallyingStateStart().sumVotes.c1);
+      let wallet = fixture.accounts[i+1];
+      let cli = await hre.viem.getContractAt("Avote", fixture.avote.address, {
+        client: { wallet: wallet},
+      })
+      const rsp = await cli.write.Decrypt([fixture.voteId, proof.proof, proof.decryption]);
       await fixture.publicClient.waitForTransactionReceipt({hash: rsp});
       const decryptEvents = await fixture.avote.getEvents.Action();
       expect(decryptEvents).to.have.lengthOf(1);
     }
-    expect(await fixture.avote.read.GetVoteInfo([fixture.voteId])).to.deep.equals(fixtureTest.TallyingStateEnd());
+    expect(await fixture.avote.read.GetActivityInfo([fixture.voteId])).to.deep.equals(fixtureTest.TallyingStateEnd());
   })
 
   it("Should change the state to published successfully", async function () {
@@ -160,10 +168,10 @@ describe("Verifier", function () {
     let state = fixtureTest.TallyingStateEnd();
     await fixture.avote.write.SetTestState([fixture.voteId, state]);
     let points: Util.BigPoint[] = [state.sumVotes.c2];
-    for (let i = 0; i < state.decryptPoints.length; i++) {
+    for (let i = 0; i < state.counters.length; i++) {
       points.push({
-        x: -state.decryptPoints[i].x,
-        y: state.decryptPoints[i].y,
+        x: -state.counters[i].decryption.x,
+        y: state.counters[i].decryption.y,
       })
     }
 
@@ -203,7 +211,7 @@ describe("Verifier", function () {
     await fixture.publicClient.waitForTransactionReceipt({hash: rsp});
     const event = await fixture.avote.getEvents.ChangeStateLog();
     expect(event).to.have.lengthOf(1);
-    expect(await fixture.avote.read.GetVoteInfo([fixture.voteId])).to.be.deep.equals(fixtureTest.PublishedState());
+    expect(await fixture.avote.read.GetActivityInfo([fixture.voteId])).to.be.deep.equals(fixtureTest.PublishedState());
   })
 });
 

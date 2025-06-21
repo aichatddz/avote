@@ -12,9 +12,19 @@ export interface Proof {
     c: [bigint, bigint];
 }
 
+export interface SubmitPublicKeyProof {
+    proof: Proof;
+    publicKey: BigPoint;
+}
+
 export interface VoteProof {
     proof: Proof;
     cipher: BigCipher;
+}
+
+export interface DecryptProof {
+    proof: Proof;
+    decryption: BigPoint;
 }
 
 export interface SumProof {

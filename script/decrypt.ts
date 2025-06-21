@@ -6,14 +6,14 @@ import { privateKeyToAccount } from "viem/accounts";
 import { configDotenv } from "dotenv"
 import { resolve } from "path";
 import { AvoteProxy } from "../deployments/contracts";
-import { Decrypt, PublicKey } from "../component/prover";
+import * as Prover from "../component/prover";
 import { ActivityID } from "./const";
 import { toPoint } from "../component/util";
 import { buildBabyjub } from "circomlibjs";
 
 const params = {
-    counter_wallet_private: process.env.SEPOLIA_PK_COUNTER3,
-    counter_private: process.env.SEPOLIA_PRIVATE_COUNTER_3,
+    counter_wallet_private: process.env.SEPOLIA_PK_COUNTER1,
+    counter_private: process.env.SEPOLIA_PRIVATE_COUNTER_1,
 }
 
 async function main() {
@@ -43,21 +43,23 @@ async function main() {
     const contract = await hre.viem.getContractAt("Avote", AvoteProxy, {
         client: {wallet: walletClient},
     })
-    let voteInfo = await contract.read.GetVoteInfo([ActivityID]);
+    let activityInfo = await contract.read.GetActivityInfo([ActivityID]);
 
     const curve = await buildBabyjub();
     
-    let prover = new Decrypt();
-    const proof = await prover.prove({
-        privateKey: params.counter_private,
-        publicKey: curve.mulPointEscalar(curve.Base8, params.counter_private),
-        c1: toPoint(curve, voteInfo.sumVotes.c1),
-    });
+    const proof = await Prover.GenerateDecryptProof(curve, BigInt(params.counter_private), activityInfo.sumVotes.c1);
+    
+    // let prover = new Decrypt();
+    // const proof = await prover.prove({
+    //     privateKey: params.counter_private,
+    //     publicKey: curve.mulPointEscalar(curve.Base8, params.counter_private),
+    //     c1: toPoint(curve, voteInfo.sumVotes.c1),
+    // });
 
     const avote = await hre.viem.getContractAt("Avote", AvoteProxy, {
         client: {wallet: walletClient}
     })
-    await avote.write.Decrypt([ActivityID, ...proof]);
+    await avote.write.Decrypt([ActivityID, proof.proof, proof.decryption]);
 }
 
 main().then(()=>{
